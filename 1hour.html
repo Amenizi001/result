@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1時間経過時点 - リレーマラソン速報</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    body { font-family: -apple-system, sans-serif; padding: 15px; background-color: #f4f6f8; margin: 0; }
+    .header { text-align: center; margin-bottom: 20px; color: #2c3e50; }
+    .nav-btn { display: block; width: 100%; padding: 12px; background: #7f8c8d; color: white; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
+    .control-panel { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .search-box { width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; }
+    .sort-select { width: 100%; padding: 10px; font-size: 14px; border-radius: 8px; }
+    
+    .team-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .team-header { display: flex; justify-content: space-between; align-items: center; }
+    .team-name { font-size: 18px; font-weight: bold; margin: 0 0 5px 0; color: #222; }
+    .laps { font-size: 24px; font-weight: bold; color: #e74c3c; }
+    #loading { text-align: center; color: #666; font-weight: bold; }
+    
+    /* 順位バッジのスタイル */
+    .rank-badge { display: inline-block; background: #f39c12; color: white; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <div class="header"><h2>⏱ 1時間経過時点 速報</h2></div>
+  
+  <!-- トップページ（最新速報）へ戻るボタン -->
+  <a href="index.html" class="nav-btn">🔙 最新の速報に戻る</a>
+
+  <div class="control-panel">
+    <input type="number" id="searchInput" class="search-box" placeholder="🔍 チーム番号(No)を入力...">
+    <select id="sortSelect" class="sort-select">
+      <option value="no">チーム番号順</option>
+      <option value="rank">順位が高い順</option>
+      <option value="laps">周回数が多い順</option>
+    </select>
+  </div>
+
+  <div id="loading">データを読み込み中...</div>
+  
+  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">1時間経過時点の記録</h3>
+  <div id="teamList"></div>
+
+  <script>
+    // ==========================================
+    // ★ 以下を「1時間経過時点（チーム番号順）」シートのCSV公開URLに書き換えてください ★
+    // ==========================================
+    const ONE_HOUR_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZLIUI--7DvhQF7M2FUIBGpzzBTU8G23XBLyBfYNbzfRbOQaoYmzy22k1YJC5LggRbrL3ifJeiuULB/pub?gid=1926496608&single=true&output=csv'; 
+    // ==========================================
+
+    let hourData = [];
+
+    window.onload = function() {
+      Papa.parse(ONE_HOUR_CSV_URL, {
+        download: true,
+        complete: function(res) {
+          // 画像に合わせて、3行目（インデックス2）からデータ開始
+          hourData = res.data.slice(2).map(row => ({
+            no: parseInt(row[0]) || 0,
+            name: row[1] || '',
+            laps: parseInt(row[2]) || 0,
+            time: row[3] || '',
+            rank: parseInt(row[4]) || 999 // 暫定順位（E列）
+          })).filter(team => team.name !== '');
+
+          document.getElementById('loading').style.display = 'none';
+          renderList(hourData);
+        }
+      });
+    };
+
+    function renderList(teams) {
+      const container = document.getElementById('teamList');
+      container.innerHTML = '';
+      teams.forEach(team => {
+        const card = document.createElement('div');
+        card.className = 'team-card';
+        
+        // 順位表示の出し分け（順位データがあればバッジを表示）
+        const rankHtml = team.rank !== 999 ? `<div class="rank-badge">${team.rank} 位</div>` : '';
+
+        card.innerHTML = `
+          <div class="team-header">
+            <div>
+              ${rankHtml}
+              <div style="font-size:12px; color:#777;">No.${team.no}</div>
+              <div class="team-name">${team.name}</div>
+              <div style="font-size:12px; color:#777;">集計時間: ${team.time}</div>
+            </div>
+            <div class="laps">${team.laps} 周</div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // 検索機能
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      const keyword = e.target.value;
+      if(keyword === '') {
+        renderList(hourData);
+      } else {
+        const filtered = hourData.filter(t => t.no.toString().includes(keyword));
+        renderList(filtered);
+      }
+    });
+
+    // ソート機能
+    document.getElementById('sortSelect').addEventListener('change', function(e) {
+      const sortType = e.target.value;
+      let sortedData = [...hourData];
+      if(sortType === 'no') sortedData.sort((a, b) => a.no - b.no);
+      else if(sortType === 'rank') sortedData.sort((a, b) => a.rank - b.rank);
+      else if(sortType === 'laps') sortedData.sort((a, b) => b.laps - a.laps);
+      renderList(sortedData);
+    });
+  </script>
+</body>
+</html>
