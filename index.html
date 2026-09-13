@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>リレーマラソン速報</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: -apple-system, sans-serif; padding: 15px; background-color: #f4f6f8; margin: 0; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .control-panel { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .search-box { width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; }
+    .sort-select { width: 100%; padding: 10px; font-size: 14px; border-radius: 8px; }
+    #searchResultArea { margin-bottom: 20px; display: none; }
+    .highlight-card { border: 2px solid #3498db; }
+    .team-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; }
+    .team-header { display: flex; justify-content: space-between; align-items: center; }
+    .team-name { font-size: 18px; font-weight: bold; margin: 0 0 5px 0; color: #222; }
+    .laps { font-size: 24px; font-weight: bold; color: #2c3e50; }
+    .team-details { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
+    .log-table { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 15px; font-size: 14px; }
+    .log-table th, .log-table td { padding: 5px; border-bottom: 1px solid #eee; }
+    .chart-container { position: relative; height: 200px; width: 100%; }
+    .nav-btn { display: block; width: 100%; padding: 12px; background: #27ae60; color: white; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
+    #loading { text-align: center; color: #666; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="header"><h2>🏆 リレーマラソン速報</h2></div>
+  
+  <!-- 1時間速報ページへのリンク -->
+  <a href="1hour.html" class="nav-btn">⏱ 1時間経過時点の速報を見る</a>
+
+  <div class="control-panel">
+    <input type="number" id="searchInput" class="search-box" placeholder="🔍 チーム番号(No)を入力...">
+    <select id="sortSelect" class="sort-select">
+      <option value="no">チーム番号順</option>
+      <option value="laps">周回数が多い順</option>
+      <option value="time">最終更新が新しい順</option>
+    </select>
+  </div>
+
+  <div id="searchResultArea">
+    <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">検索結果</h3>
+    <div id="searchResultCard"></div>
+  </div>
+
+  <div id="loading">データを読み込み中...</div>
+  
+  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加チーム一覧</h3>
+  <div id="teamList"></div>
+
+  <script>
+    // ==========================================
+    // ★ 以下を「集計速報」と「シート4」のCSV公開URLに書き換えてください ★
+    // ==========================================
+    const SUMMARY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZLIUI--7DvhQF7M2FUIBGpzzBTU8G23XBLyBfYNbzfRbOQaoYmzy22k1YJC5LggRbrL3ifJeiuULB/pub?gid=0&single=true&output=csv'; // 「集計速報（チーム番号順）」のCSV URL
+    const HISTORY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZLIUI--7DvhQF7M2FUIBGpzzBTU8G23XBLyBfYNbzfRbOQaoYmzy22k1YJC5LggRbrL3ifJeiuULB/pub?gid=1681943745&single=true&output=csv'; // 「シート4」のCSV URL History
+    // ==========================================
+
+    let summaryData = [];
+    let historyLogs = [];
+    let chartInstances = {};
+    let startTime; 
+
+    window.onload = function() {
+      // 1. 集計速報データを読み込む
+      Papa.parse(SUMMARY_CSV_URL, {
+        download: true,
+        complete: function(summaryRes) {
+          
+          // 集計速報は3行目（インデックス2）からデータ開始
+          summaryData = summaryRes.data.slice(2).map(row => ({
+            no: parseInt(row[0]) || 0,
+            name: row[1] || '',
+            laps: parseInt(row[2]) || 0,
+            time: row[3] || ''
+          })).filter(team => team.name !== '');
+
+          // 2. シート4（履歴とスタート時間）を読み込む
+          Papa.parse(HISTORY_CSV_URL, {
+            download: true,
+            complete: function(historyRes) {
+              
+              // シート4のB1（0行目、1列目）からスタート時間を自動取得
+              const startTimeStr = historyRes.data[0][1];
+              startTime = new Date(startTimeStr);
+
+              // シート4のログデータは4行目（インデックス3）から開始
+              historyLogs = historyRes.data.slice(3).map(row => ({
+                no: parseInt(row[0]) || 0,
+                laps: parseInt(row[1]) || 0,
+                timeStr: row[2] || ''
+              })).filter(log => log.no > 0 && log.timeStr !== '');
+
+              document.getElementById('loading').style.display = 'none';
+              renderList(summaryData);
+            }
+          });
+        }
+      });
+    };
+
+    function renderList(teams) {
+      const container = document.getElementById('teamList');
+      container.innerHTML = '';
+      teams.forEach(team => {
+        container.appendChild(createTeamCard(team, false));
+      });
+    }
+
+    function createTeamCard(team, isHighlight) {
+      const card = document.createElement('div');
+      card.className = 'team-card' + (isHighlight ? ' highlight-card' : '');
+      const canvasId = 'chart-' + (isHighlight ? 'search-' : 'list-') + team.no;
+
+      card.innerHTML = `
+        <div class="team-header" onclick="toggleDetails(this, ${team.no}, '${canvasId}')">
+          <div>
+            <div style="font-size:12px; color:#777;">No.${team.no}</div>
+            <div class="team-name">${team.name}</div>
+            <div style="font-size:12px; color:#777;">最終更新: ${team.time}</div>
+          </div>
+          <div class="laps">${team.laps} 周 <span>▼</span></div>
+        </div>
+        <div class="team-details">
+          <div style="max-height: 150px; overflow-y: auto;">
+            <table class="log-table" id="log-table-${team.no}">
+              <tr><th>周回</th><th>計測時刻</th><th>経過時間</th></tr>
+            </table>
+          </div>
+          <div class="chart-container">
+            <canvas id="${canvasId}"></canvas>
+          </div>
+        </div>
+      `;
+      return card;
+    }
+
+    window.toggleDetails = function(element, teamNo, canvasId) {
+      const detailsDiv = element.nextElementSibling;
+      if (detailsDiv.style.display === 'block') {
+        detailsDiv.style.display = 'none';
+      } else {
+        detailsDiv.style.display = 'block';
+        buildDetails(teamNo, canvasId);
+      }
+    };
+
+    function buildDetails(teamNo, canvasId) {
+      let teamLogs = historyLogs
+        .filter(log => log.no === teamNo)
+        .sort((a, b) => new Date(a.timeStr) - new Date(b.timeStr));
+
+      const table = document.getElementById(`log-table-${teamNo}`);
+      let tableHtml = '<tr><th>周回</th><th>計測時刻</th><th>経過時間</th></tr>';
+      
+      const dataPoints = [{ x: 0, y: 0 }];
+
+      teamLogs.forEach(log => {
+        const logTime = new Date(log.timeStr);
+        let elapsedMin = Math.floor((logTime - startTime) / 60000);
+        if(elapsedMin < 0) elapsedMin = 0; 
+
+        const timeDisplay = log.timeStr.split(' ')[1] || log.timeStr;
+        tableHtml += `<tr><td>${log.laps}</td><td>${timeDisplay}</td><td>${elapsedMin}分</td></tr>`;
+        dataPoints.push({ x: elapsedMin, y: log.laps });
+      });
+
+      table.innerHTML = tableHtml;
+
+      if (chartInstances[canvasId]) return;
+      
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      chartInstances[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: '周回数',
+            data: dataPoints,
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52, 152, 219, 0.2)',
+            borderWidth: 2,
+            stepped: true, 
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: 'linear', min: 0, max: 180, title: { display: true, text: '経過時間（分）' } },
+            y: { beginAtZero: true, suggestedMax: 10, ticks: { stepSize: 1 }, title: { display: true, text: '周回数' } }
+          }
+        }
+      });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      const keyword = e.target.value;
+      const searchArea = document.getElementById('searchResultArea');
+      const searchCardContainer = document.getElementById('searchResultCard');
+      if(keyword === '') {
+        searchArea.style.display = 'none';
+      } else {
+        const targetTeam = summaryData.find(t => t.no.toString() === keyword);
+        if(targetTeam) {
+          searchArea.style.display = 'block';
+          searchCardContainer.innerHTML = '';
+          searchCardContainer.appendChild(createTeamCard(targetTeam, true));
+        } else {
+          searchArea.style.display = 'none';
+        }
+      }
+    });
+
+    document.getElementById('sortSelect').addEventListener('change', function(e) {
+      const sortType = e.target.value;
+      let sortedData = [...summaryData];
+      if(sortType === 'no') sortedData.sort((a, b) => a.no - b.no);
+      else if(sortType === 'laps') sortedData.sort((a, b) => b.laps - a.laps);
+      else if(sortType === 'time') sortedData.sort((a, b) => b.time.localeCompare(a.time));
+      renderList(sortedData);
+    });
+  </script>
+</body>
+</html>
