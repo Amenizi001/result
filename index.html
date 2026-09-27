@@ -20,20 +20,19 @@
     .laps { font-size: 24px; font-weight: bold; color: #2c3e50; }
     .team-details { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
     
-    /* ▼ 表のスクロールと固定見出しの修正 ▼ */
     .table-scroll-container {
-      max-height: 250px; /* 高さを少し広げました */
+      max-height: 250px; 
       overflow-y: auto;
       border: 1px solid #ddd;
       border-radius: 4px;
       margin-bottom: 15px;
-      -webkit-overflow-scrolling: touch; /* スマホで滑らかにスクロールさせる */
+      -webkit-overflow-scrolling: touch; 
     }
     .log-table { width: 100%; text-align: left; border-collapse: collapse; font-size: 14px; }
     .log-table th { 
-      position: sticky; /* 見出しを上部に固定 */
+      position: sticky; 
       top: 0; 
-      background-color: #e9ecef; /* 見出しの背景色 */
+      background-color: #e9ecef; 
       padding: 8px; 
       z-index: 10;
       border-bottom: 1px solid #ccc;
@@ -99,10 +98,12 @@
               const startTimeStr = historyRes.data[0][1];
               startTime = new Date(startTimeStr);
 
+              // ★ D列（インデックス3）の「写真URL」も取得するように変更 ★
               historyLogs = historyRes.data.slice(3).map(row => ({
                 no: parseInt(row[0]) || 0,
                 laps: parseInt(row[1]) || 0,
-                timeStr: row[2] || ''
+                timeStr: row[2] || '',
+                photoUrl: row[3] ? row[3].trim() : '' 
               })).filter(log => log.no > 0 && log.timeStr !== '');
 
               document.getElementById('loading').style.display = 'none';
@@ -138,7 +139,8 @@
         <div class="team-details">
           <div class="table-scroll-container">
             <table class="log-table" id="log-table-${team.no}">
-              <tr><th>周回</th><th>計測時刻</th><th>経過時間</th></tr>
+              <!-- ★ 「写真」列を追加 ★ -->
+              <tr><th>周回</th><th>計測時刻</th><th>経過時間</th><th style="text-align:center;">写真</th></tr>
             </table>
           </div>
           <div class="chart-container">
@@ -165,7 +167,8 @@
         .sort((a, b) => new Date(a.timeStr) - new Date(b.timeStr));
 
       const table = document.getElementById(`log-table-${teamNo}`);
-      let tableHtml = '<tr><th>周回</th><th>計測時刻</th><th>経過時間</th></tr>';
+      // ★ 「写真」列を追加 ★
+      let tableHtml = '<tr><th>周回</th><th>計測時刻</th><th>経過時間</th><th style="text-align:center;">写真</th></tr>';
       
       const dataPoints = [{ x: 0, y: 0 }];
 
@@ -175,7 +178,12 @@
         if(elapsedMin < 0) elapsedMin = 0; 
 
         const timeDisplay = log.timeStr.split(' ')[1] || log.timeStr;
-        tableHtml += `<tr><td>${log.laps}</td><td>${timeDisplay}</td><td>${elapsedMin}分</td></tr>`;
+        
+        // ★ 写真URLがあれば絵文字のリンクを表示、なければ「-」を表示 ★
+        const photoLink = log.photoUrl ? `<a href="${log.photoUrl}" target="_blank" style="text-decoration:none; font-size:16px;">🖼️</a>` : '<span style="color:#ccc;">-</span>';
+
+        tableHtml += `<tr><td>${log.laps}</td><td>${timeDisplay}</td><td>${elapsedMin}分</td><td style="text-align:center;">${photoLink}</td></tr>`;
+        
         dataPoints.push({ x: elapsedMin, y: log.laps });
       });
 
