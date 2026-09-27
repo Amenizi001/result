@@ -82,7 +82,6 @@
 
   <div id="loading">データを読み込み中...</div>
   
-  <!-- ★ 修正: お気に入りエリアをまとめて上部に配置 -->
   <div id="favSection" style="display: none;">
     <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">⭐ お気に入りチーム一覧</h3>
     <div id="favTeamList"></div>
@@ -95,7 +94,6 @@
     </div>
   </div>
   
-  <!-- ★ 修正: その他の参加チーム一覧を一番下に配置 -->
   <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加チーム一覧</h3>
   <div id="otherTeamList"></div>
 
@@ -115,13 +113,15 @@
 
     const colorPalette = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#34495e'];
 
+    // ★ 修正：画像URLを、ログイン要求されにくい「Googleドライブ公式ビューア」のURLに変更
     function getDirectImageUrl(url) {
       if (!url || !url.includes('drive.google.com')) return url;
       const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
       const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
       const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
       if (fileId) {
-        return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        // 直接表示（uc?export=view）ではなく、公式のプレビュー表示に変更
+        return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
       }
       return url;
     }
@@ -248,7 +248,6 @@
       let favoriteTeams = sortedData.filter(t => favs.includes(t.no));
       let otherTeams = sortedData.filter(t => !favs.includes(t.no));
 
-      // ★ 修正: お気に入りチームの有無で、お気に入りセクション全体の表示・非表示を切り替え
       const favSection = document.getElementById('favSection');
       if (favoriteTeams.length > 0) {
         favSection.style.display = 'block';
@@ -329,7 +328,7 @@
 
     function drawFavoriteChart(favTeams) {
       if (!favTeams || favTeams.length === 0) {
-        return; // お気に入りが無ければ何もしない
+        return; 
       }
 
       if (favChartInstance) {
