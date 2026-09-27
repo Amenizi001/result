@@ -44,6 +44,12 @@
     
     .nav-btn { display: block; width: 100%; padding: 12px; background: #27ae60; color: white; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
     #loading { text-align: center; color: #666; font-weight: bold; }
+
+    /* ★ 画像ポップアップ（モーダル）用のスタイル */
+    #imageModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; }
+    #modalImage { max-width: 95%; max-height: 80%; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    .modal-close { position: absolute; top: 20px; right: 25px; color: white; font-size: 35px; cursor: pointer; user-select: none; }
+    .modal-note { color: #ccc; margin-top: 15px; font-size: 12px; text-align: center; padding: 0 10px; }
   </style>
 </head>
 <body>
@@ -53,8 +59,6 @@
     ⚠️ <strong>ご注意</strong><br>
     本ページに表示されているデータは速報値であり、正式な最終結果ではありません。
   </div>
-
-  <!-- <a href="1hour.html" class="nav-btn">⏱ 1時間経過時点の速報を見る</a> -->
 
   <div class="control-panel">
     <button class="reload-btn" onclick="location.reload()">🔄 最新データに更新</button>
@@ -97,6 +101,13 @@
   <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加チーム一覧</h3>
   <div id="otherTeamList"></div>
 
+  <!-- ★ 追加：画像を画面内に表示するための隠し要素 -->
+  <div id="imageModal">
+    <span class="modal-close" onclick="closeModal()">×</span>
+    <img id="modalImage" src="" alt="通過写真">
+    <div class="modal-note">※画像が表示されない場合は、Googleドライブの共有設定（リンクを知っている全員）をご確認ください。画面をタップで閉じます。</div>
+  </div>
+
   <script>
     // ==========================================
     // ★ 以下のURLをご自身のものに書き換えてください ★
@@ -113,18 +124,40 @@
 
     const colorPalette = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#34495e'];
 
-    // ★ 修正：画像URLを、ログイン要求されにくい「Googleドライブ公式ビューア」のURLに変更
+    // ★ 修正: 直接画像データを取得するURLに戻します（imgタグで読み込むため）
     function getDirectImageUrl(url) {
       if (!url || !url.includes('drive.google.com')) return url;
       const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
       const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
       const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
       if (fileId) {
-        // 直接表示（uc?export=view）ではなく、公式のプレビュー表示に変更
-        return `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+        return `https://drive.google.com/uc?export=view&id=${fileId}`;
       }
       return url;
     }
+
+    // ★ 追加: 画像をポップアップで開く関数
+    window.openImageModal = function(url) {
+      const modal = document.getElementById('imageModal');
+      const img = document.getElementById('modalImage');
+      img.src = url;
+      modal.style.display = 'flex';
+    };
+
+    // ★ 追加: 画像ポップアップを閉じる関数
+    window.closeModal = function() {
+      const modal = document.getElementById('imageModal');
+      const img = document.getElementById('modalImage');
+      modal.style.display = 'none';
+      img.src = ''; // 閉じた時に画像をリセット
+    };
+
+    // ★ 追加: 背景の黒い部分をタップしても閉じるようにする
+    document.getElementById('imageModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
 
     function getFavorites() {
       return JSON.parse(localStorage.getItem('favoriteTeams') || '[]');
@@ -407,7 +440,9 @@
         const timeDisplay = log.timeStr.split(' ')[1] || log.timeStr;
         
         const directUrl = getDirectImageUrl(log.photoUrl);
-        const photoLink = log.photoUrl ? `<a href="${directUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; font-size:16px;">🖼️</a>` : '<span style="color:#ccc;">-</span>';
+        
+        // ★ 修正: クリックした時に別タブへ飛ぶのではなく、画面内にポップアップさせる
+        const photoLink = log.photoUrl ? `<span onclick="openImageModal('${directUrl}')" style="cursor:pointer; font-size:16px;">🖼️</span>` : '<span style="color:#ccc;">-</span>';
 
         tableHtml += `<tr><td>${log.laps}</td><td>${timeDisplay}</td><td>${elapsedMin}分</td><td style="text-align:center;">${photoLink}</td></tr>`;
         dataPoints.push({ x: elapsedMin, y: log.laps });
