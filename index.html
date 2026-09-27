@@ -19,8 +19,27 @@
     .team-name { font-size: 18px; font-weight: bold; margin: 0 0 5px 0; color: #222; }
     .laps { font-size: 24px; font-weight: bold; color: #2c3e50; }
     .team-details { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
-    .log-table { width: 100%; text-align: left; border-collapse: collapse; margin-bottom: 15px; font-size: 14px; }
-    .log-table th, .log-table td { padding: 5px; border-bottom: 1px solid #eee; }
+    
+    /* ▼ 表のスクロールと固定見出しの修正 ▼ */
+    .table-scroll-container {
+      max-height: 250px; /* 高さを少し広げました */
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      -webkit-overflow-scrolling: touch; /* スマホで滑らかにスクロールさせる */
+    }
+    .log-table { width: 100%; text-align: left; border-collapse: collapse; font-size: 14px; }
+    .log-table th { 
+      position: sticky; /* 見出しを上部に固定 */
+      top: 0; 
+      background-color: #e9ecef; /* 見出しの背景色 */
+      padding: 8px; 
+      z-index: 10;
+      border-bottom: 1px solid #ccc;
+    }
+    .log-table td { padding: 8px; border-bottom: 1px solid #eee; }
+    
     .chart-container { position: relative; height: 200px; width: 100%; }
     .nav-btn { display: block; width: 100%; padding: 12px; background: #27ae60; color: white; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
     #loading { text-align: center; color: #666; font-weight: bold; }
@@ -29,7 +48,6 @@
 <body>
   <div class="header"><h2>🏆 リレーマラソン速報</h2></div>
   
-  <!-- 1時間速報ページへのリンク -->
   <a href="1hour.html" class="nav-btn">⏱ 1時間経過時点の速報を見る</a>
 
   <div class="control-panel">
@@ -53,7 +71,7 @@
 
   <script>
     // ==========================================
-    // ★ 以下を「集計速報」と「シート4」のCSV公開URLに書き換えてください ★
+    // ★ 以下のURLを再度ご自身のものに書き換えてください ★
     // ==========================================
     const SUMMARY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZLIUI--7DvhQF7M2FUIBGpzzBTU8G23XBLyBfYNbzfRbOQaoYmzy22k1YJC5LggRbrL3ifJeiuULB/pub?gid=0&single=true&output=csv'; // 「集計速報（チーム番号順）」のCSV URL
     const HISTORY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZLIUI--7DvhQF7M2FUIBGpzzBTU8G23XBLyBfYNbzfRbOQaoYmzy22k1YJC5LggRbrL3ifJeiuULB/pub?gid=1681943745&single=true&output=csv'; // 「シート4」のCSV URL History
@@ -65,12 +83,9 @@
     let startTime; 
 
     window.onload = function() {
-      // 1. 集計速報データを読み込む
       Papa.parse(SUMMARY_CSV_URL, {
         download: true,
         complete: function(summaryRes) {
-          
-          // 集計速報は3行目（インデックス2）からデータ開始
           summaryData = summaryRes.data.slice(2).map(row => ({
             no: parseInt(row[0]) || 0,
             name: row[1] || '',
@@ -78,16 +93,12 @@
             time: row[3] || ''
           })).filter(team => team.name !== '');
 
-          // 2. シート4（履歴とスタート時間）を読み込む
           Papa.parse(HISTORY_CSV_URL, {
             download: true,
             complete: function(historyRes) {
-              
-              // シート4のB1（0行目、1列目）からスタート時間を自動取得
               const startTimeStr = historyRes.data[0][1];
               startTime = new Date(startTimeStr);
 
-              // シート4のログデータは4行目（インデックス3）から開始
               historyLogs = historyRes.data.slice(3).map(row => ({
                 no: parseInt(row[0]) || 0,
                 laps: parseInt(row[1]) || 0,
@@ -125,7 +136,7 @@
           <div class="laps">${team.laps} 周 <span>▼</span></div>
         </div>
         <div class="team-details">
-          <div style="max-height: 150px; overflow-y: auto;">
+          <div class="table-scroll-container">
             <table class="log-table" id="log-table-${team.no}">
               <tr><th>周回</th><th>計測時刻</th><th>経過時間</th></tr>
             </table>
