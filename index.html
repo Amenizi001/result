@@ -8,38 +8,40 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: -apple-system, sans-serif; padding: 15px; background-color: #f4f6f8; margin: 0; }
-    .header { text-align: center; margin-bottom: 20px; }
+    .header { text-align: center; margin-bottom: 15px; }
+    
+    .notice-box { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 12px 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; line-height: 1.5; }
+    
     .control-panel { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
     .search-box { width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; }
     .sort-select { width: 100%; padding: 10px; font-size: 14px; border-radius: 8px; }
+    
+    .reload-btn { width: 100%; padding: 12px; background: #3498db; color: white; border: none; font-size: 16px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .reload-btn:active { background: #2980b9; transform: translateY(1px); }
+    .reload-note { font-size: 11px; color: #7f8c8d; text-align: center; margin-bottom: 15px; }
+    
+    .global-update-time { text-align: center; font-size: 14px; font-weight: bold; color: #e74c3c; margin-bottom: 15px; background: #fdf2e9; padding: 8px; border-radius: 8px; }
+
     #searchResultArea { margin-bottom: 20px; display: none; }
     .highlight-card { border: 2px solid #3498db; }
     .team-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; }
     .team-header { display: flex; justify-content: space-between; align-items: center; }
+    
+    .fav-btn { font-size: 24px; color: #ccc; margin-right: 12px; cursor: pointer; transition: color 0.2s; user-select: none; }
+    .fav-btn.active { color: #f1c40f; } 
+    
     .team-name { font-size: 18px; font-weight: bold; margin: 0 0 5px 0; color: #222; }
     .laps { font-size: 24px; font-weight: bold; color: #2c3e50; }
     .team-details { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
     
-    .table-scroll-container {
-      max-height: 250px; 
-      overflow-y: auto;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      margin-bottom: 15px;
-      -webkit-overflow-scrolling: touch; 
-    }
+    .table-scroll-container { max-height: 250px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px; -webkit-overflow-scrolling: touch; }
     .log-table { width: 100%; text-align: left; border-collapse: collapse; font-size: 14px; }
-    .log-table th { 
-      position: sticky; 
-      top: 0; 
-      background-color: #e9ecef; 
-      padding: 8px; 
-      z-index: 10;
-      border-bottom: 1px solid #ccc;
-    }
+    .log-table th { position: sticky; top: 0; background-color: #e9ecef; padding: 8px; z-index: 10; border-bottom: 1px solid #ccc; }
     .log-table td { padding: 8px; border-bottom: 1px solid #eee; }
     
     .chart-container { position: relative; height: 200px; width: 100%; }
+    .fav-chart-container { position: relative; height: 250px; width: 100%; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 12px; box-sizing: border-box; }
+    
     .nav-btn { display: block; width: 100%; padding: 12px; background: #27ae60; color: white; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
     #loading { text-align: center; color: #666; font-weight: bold; }
   </style>
@@ -47,10 +49,26 @@
 <body>
   <div class="header"><h2>🏆 リレーマラソン速報</h2></div>
   
+  <div class="notice-box">
+    ⚠️ <strong>ご注意</strong><br>
+    本ページに表示されているデータは速報値であり、正式な最終結果を保証するものではありません。最終的な確定順位・記録につきましては、大会運営からの公式発表をご確認ください。
+  </div>
+
   <a href="1hour.html" class="nav-btn">⏱ 1時間経過時点の速報を見る</a>
 
   <div class="control-panel">
+    <button class="reload-btn" onclick="location.reload()">🔄 最新データに更新</button>
+    <div class="reload-note">※システム反映まで数分かかる場合があります</div>
+    
+    <div id="globalUpdateTime" class="global-update-time">データの最終更新: 取得中...</div>
+    
     <input type="number" id="searchInput" class="search-box" placeholder="🔍 チーム番号(No)を入力...">
+    
+    <!-- ★ カテゴリー絞り込み用（データが存在する場合のみ表示されます） -->
+    <select id="categorySelect" class="sort-select" style="margin-bottom: 10px; display: none;">
+      <option value="all">すべてのカテゴリー</option>
+    </select>
+
     <select id="sortSelect" class="sort-select">
       <option value="no">チーム番号順</option>
       <option value="laps">周回数が多い順</option>
@@ -66,11 +84,21 @@
   <div id="loading">データを読み込み中...</div>
   
   <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加チーム一覧</h3>
-  <div id="teamList"></div>
+  
+  <div id="favTeamList"></div>
+  
+  <div id="favoriteArea" style="display: none; margin-top: 15px; margin-bottom: 15px;">
+    <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">⭐ お気に入りチームの比較グラフ</h3>
+    <div class="fav-chart-container">
+      <canvas id="favChart"></canvas>
+    </div>
+  </div>
+
+  <div id="otherTeamList"></div>
 
   <script>
     // ==========================================
-    // ★ 以下のURLを再度ご自身のものに書き換えてください ★
+    // ★ 以下のURLをご自身のものに書き換えてください ★
     // ==========================================
     const SUMMARY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZLIUI--7DvhQF7M2FUIBGpzzBTU8G23XBLyBfYNbzfRbOQaoYmzy22k1YJC5LggRbrL3ifJeiuULB/pub?gid=0&single=true&output=csv'; // 「集計速報（チーム番号順）」のCSV URL
     const HISTORY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQZLIUI--7DvhQF7M2FUIBGpzzBTU8G23XBLyBfYNbzfRbOQaoYmzy22k1YJC5LggRbrL3ifJeiuULB/pub?gid=1681943745&single=true&output=csv'; // 「シート4」のCSV URL History
@@ -80,16 +108,48 @@
     let historyLogs = [];
     let chartInstances = {};
     let startTime; 
+    let favChartInstance = null; 
+
+    const colorPalette = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#34495e'];
+
+    function getDirectImageUrl(url) {
+      if (!url || !url.includes('drive.google.com')) return url;
+      const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
+      const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
+      if (fileId) {
+        return `https://drive.google.com/uc?export=view&id=${fileId}`;
+      }
+      return url;
+    }
+
+    function getFavorites() {
+      return JSON.parse(localStorage.getItem('favoriteTeams') || '[]');
+    }
+
+    window.toggleFavorite = function(event, teamNo) {
+      event.stopPropagation(); 
+      let favs = getFavorites();
+      if (favs.includes(teamNo)) {
+        favs = favs.filter(n => n !== teamNo); 
+      } else {
+        favs.push(teamNo); 
+      }
+      localStorage.setItem('favoriteTeams', JSON.stringify(favs));
+      applySortAndSearch();
+    };
 
     window.onload = function() {
       Papa.parse(SUMMARY_CSV_URL, {
         download: true,
         complete: function(summaryRes) {
+          // ★ 修正: E列（5列目、インデックス4）をカテゴリーとして読み込む
           summaryData = summaryRes.data.slice(2).map(row => ({
             no: parseInt(row[0]) || 0,
             name: row[1] || '',
             laps: parseInt(row[2]) || 0,
-            time: row[3] || ''
+            time: row[3] || '',
+            category: row[4] ? row[4].trim() : '' 
           })).filter(team => team.name !== '');
 
           Papa.parse(HISTORY_CSV_URL, {
@@ -98,7 +158,6 @@
               const startTimeStr = historyRes.data[0][1];
               startTime = new Date(startTimeStr);
 
-              // ★ D列（インデックス3）の「写真URL」も取得するように変更 ★
               historyLogs = historyRes.data.slice(3).map(row => ({
                 no: parseInt(row[0]) || 0,
                 laps: parseInt(row[1]) || 0,
@@ -107,15 +166,112 @@
               })).filter(log => log.no > 0 && log.timeStr !== '');
 
               document.getElementById('loading').style.display = 'none';
-              renderList(summaryData);
+              
+              // ★ カテゴリーのドロップダウンリストを動的に生成
+              const categories = [...new Set(summaryData.map(t => t.category).filter(c => c !== ''))];
+              const catSelect = document.getElementById('categorySelect');
+              if (categories.length > 0) {
+                catSelect.style.display = 'block';
+                categories.forEach(cat => {
+                  const opt = document.createElement('option');
+                  opt.value = cat;
+                  opt.textContent = cat;
+                  catSelect.appendChild(opt);
+                });
+              }
+
+              displayGlobalUpdateTime();
+              restoreStateAndRender();
             }
           });
         }
       });
     };
 
-    function renderList(teams) {
-      const container = document.getElementById('teamList');
+    function displayGlobalUpdateTime() {
+      let latestTime = null;
+      historyLogs.forEach(log => {
+        if (!log.timeStr) return;
+        const logDate = new Date(log.timeStr);
+        if (!isNaN(logDate.getTime())) {
+          if (!latestTime || logDate > latestTime) {
+            latestTime = logDate;
+          }
+        }
+      });
+
+      const updateDiv = document.getElementById('globalUpdateTime');
+      if (latestTime) {
+        const month = latestTime.getMonth() + 1;
+        const date = latestTime.getDate();
+        const hours = String(latestTime.getHours()).padStart(2, '0');
+        const minutes = String(latestTime.getMinutes()).padStart(2, '0');
+        updateDiv.innerHTML = `🕒 データ最新状態: ${month}/${date} ${hours}:${minutes} 時点`;
+      } else {
+        updateDiv.innerHTML = `🕒 データ最新状態: 確認できません`;
+      }
+    }
+
+    function restoreStateAndRender() {
+      const savedSort = sessionStorage.getItem('sortType');
+      if (savedSort) {
+        document.getElementById('sortSelect').value = savedSort;
+      }
+      const savedCategory = sessionStorage.getItem('categoryType');
+      if (savedCategory) {
+        document.getElementById('categorySelect').value = savedCategory;
+      }
+      const savedSearch = sessionStorage.getItem('searchKeyword');
+      if (savedSearch) {
+        document.getElementById('searchInput').value = savedSearch;
+      }
+      applySortAndSearch();
+    }
+
+    function applySortAndSearch() {
+      const sortType = document.getElementById('sortSelect').value;
+      const categoryType = document.getElementById('categorySelect').value;
+      const keyword = document.getElementById('searchInput').value;
+      const favs = getFavorites();
+      
+      let sortedData = [...summaryData];
+      
+      // ★ カテゴリーでの絞り込み処理
+      if (categoryType !== 'all') {
+        sortedData = sortedData.filter(t => t.category === categoryType);
+      }
+
+      // 並び替え処理
+      if(sortType === 'no') sortedData.sort((a, b) => a.no - b.no);
+      else if(sortType === 'laps') sortedData.sort((a, b) => b.laps - a.laps);
+      else if(sortType === 'time') sortedData.sort((a, b) => b.time.localeCompare(a.time));
+      
+      let favoriteTeams = sortedData.filter(t => favs.includes(t.no));
+      let otherTeams = sortedData.filter(t => !favs.includes(t.no));
+
+      renderList(favoriteTeams, 'favTeamList');
+      renderList(otherTeams, 'otherTeamList');
+
+      drawFavoriteChart(favoriteTeams);
+
+      const searchArea = document.getElementById('searchResultArea');
+      const searchCardContainer = document.getElementById('searchResultCard');
+      if(keyword === '') {
+        searchArea.style.display = 'none';
+      } else {
+        const targetTeam = summaryData.find(t => t.no.toString() === keyword);
+        if(targetTeam) {
+          searchArea.style.display = 'block';
+          searchCardContainer.innerHTML = '';
+          searchCardContainer.appendChild(createTeamCard(targetTeam, true));
+        } else {
+          searchArea.style.display = 'none';
+        }
+      }
+    }
+
+    function renderList(teams, containerId) {
+      const container = document.getElementById(containerId);
       container.innerHTML = '';
       teams.forEach(team => {
         container.appendChild(createTeamCard(team, false));
@@ -126,20 +282,31 @@
       const card = document.createElement('div');
       card.className = 'team-card' + (isHighlight ? ' highlight-card' : '');
       const canvasId = 'chart-' + (isHighlight ? 'search-' : 'list-') + team.no;
+      
+      const favs = getFavorites();
+      const isFav = favs.includes(team.no);
+      
+      // ★ カテゴリーがある場合はチーム名の下に小さく表示する
+      const categoryBadge = team.category ? `<span style="display:inline-block; background:#e2e8f0; color:#4a5568; font-size:11px; padding:2px 6px; border-radius:4px; margin-bottom:4px;">${team.category}</span><br>` : '';
 
       card.innerHTML = `
         <div class="team-header" onclick="toggleDetails(this, ${team.no}, '${canvasId}')">
-          <div>
-            <div style="font-size:12px; color:#777;">No.${team.no}</div>
-            <div class="team-name">${team.name}</div>
-            <div style="font-size:12px; color:#777;">最終更新: ${team.time}</div>
+          <div style="display: flex; align-items: center;">
+            <div class="fav-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite(event, ${team.no})">
+              ${isFav ? '★' : '☆'}
+            </div>
+            <div>
+              <div style="font-size:12px; color:#777;">No.${team.no}</div>
+              ${categoryBadge}
+              <div class="team-name">${team.name}</div>
+              <div style="font-size:12px; color:#777;">最終更新: ${team.time}</div>
+            </div>
           </div>
           <div class="laps">${team.laps} 周 <span>▼</span></div>
         </div>
         <div class="team-details">
           <div class="table-scroll-container">
             <table class="log-table" id="log-table-${team.no}">
-              <!-- ★ 「写真」列を追加 ★ -->
               <tr><th>周回</th><th>計測時刻</th><th>経過時間</th><th style="text-align:center;">写真</th></tr>
             </table>
           </div>
@@ -149,6 +316,64 @@
         </div>
       `;
       return card;
+    }
+
+    function drawFavoriteChart(favTeams) {
+      const favArea = document.getElementById('favoriteArea');
+      
+      if (!favTeams || favTeams.length === 0) {
+        favArea.style.display = 'none';
+        return;
+      }
+      favArea.style.display = 'block';
+
+      if (favChartInstance) {
+        favChartInstance.destroy();
+      }
+
+      const datasets = favTeams.map((team, index) => {
+        let teamLogs = historyLogs
+          .filter(log => log.no === team.no)
+          .sort((a, b) => new Date(a.timeStr) - new Date(b.timeStr));
+        
+        const dataPoints = [{ x: 0, y: 0 }];
+        teamLogs.forEach(log => {
+          const logTime = new Date(log.timeStr);
+          let elapsedMin = Math.floor((logTime - startTime) / 60000);
+          if (elapsedMin < 0) elapsedMin = 0;
+          dataPoints.push({ x: elapsedMin, y: log.laps });
+        });
+
+        return {
+          label: team.name + ` (No.${team.no})`,
+          data: dataPoints,
+          borderColor: colorPalette[index % colorPalette.length], 
+          backgroundColor: colorPalette[index % colorPalette.length],
+          borderWidth: 2,
+          stepped: true,
+          fill: false 
+        };
+      });
+
+      const ctx = document.getElementById('favChart').getContext('2d');
+      favChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: { datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: 'linear', min: 0, max: 180, title: { display: true, text: '経過時間（分）' } },
+            y: { beginAtZero: true, suggestedMax: 10, ticks: { stepSize: 1 }, title: { display: true, text: '周回数' } }
+          },
+          plugins: {
+            legend: {
+              position: 'top', 
+              labels: { boxWidth: 12, font: { size: 10 } }
+            }
+          }
+        }
+      });
     }
 
     window.toggleDetails = function(element, teamNo, canvasId) {
@@ -167,7 +392,6 @@
         .sort((a, b) => new Date(a.timeStr) - new Date(b.timeStr));
 
       const table = document.getElementById(`log-table-${teamNo}`);
-      // ★ 「写真」列を追加 ★
       let tableHtml = '<tr><th>周回</th><th>計測時刻</th><th>経過時間</th><th style="text-align:center;">写真</th></tr>';
       
       const dataPoints = [{ x: 0, y: 0 }];
@@ -176,20 +400,20 @@
         const logTime = new Date(log.timeStr);
         let elapsedMin = Math.floor((logTime - startTime) / 60000);
         if(elapsedMin < 0) elapsedMin = 0; 
-
         const timeDisplay = log.timeStr.split(' ')[1] || log.timeStr;
         
-        // ★ 写真URLがあれば絵文字のリンクを表示、なければ「-」を表示 ★
-        const photoLink = log.photoUrl ? `<a href="${log.photoUrl}" target="_blank" style="text-decoration:none; font-size:16px;">🖼️</a>` : '<span style="color:#ccc;">-</span>';
+        const directUrl = getDirectImageUrl(log.photoUrl);
+        const photoLink = log.photoUrl ? `<a href="${directUrl}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; font-size:16px;">🖼️</a>` : '<span style="color:#ccc;">-</span>';
 
         tableHtml += `<tr><td>${log.laps}</td><td>${timeDisplay}</td><td>${elapsedMin}分</td><td style="text-align:center;">${photoLink}</td></tr>`;
-        
         dataPoints.push({ x: elapsedMin, y: log.laps });
       });
 
       table.innerHTML = tableHtml;
 
-      if (chartInstances[canvasId]) return;
+      if (chartInstances[canvasId]) {
+        chartInstances[canvasId].destroy();
+      }
       
       const ctx = document.getElementById(canvasId).getContext('2d');
       chartInstances[canvasId] = new Chart(ctx, {
@@ -217,30 +441,19 @@
     }
 
     document.getElementById('searchInput').addEventListener('input', function(e) {
-      const keyword = e.target.value;
-      const searchArea = document.getElementById('searchResultArea');
-      const searchCardContainer = document.getElementById('searchResultCard');
-      if(keyword === '') {
-        searchArea.style.display = 'none';
-      } else {
-        const targetTeam = summaryData.find(t => t.no.toString() === keyword);
-        if(targetTeam) {
-          searchArea.style.display = 'block';
-          searchCardContainer.innerHTML = '';
-          searchCardContainer.appendChild(createTeamCard(targetTeam, true));
-        } else {
-          searchArea.style.display = 'none';
-        }
-      }
+      sessionStorage.setItem('searchKeyword', e.target.value);
+      applySortAndSearch();
     });
 
     document.getElementById('sortSelect').addEventListener('change', function(e) {
-      const sortType = e.target.value;
-      let sortedData = [...summaryData];
-      if(sortType === 'no') sortedData.sort((a, b) => a.no - b.no);
-      else if(sortType === 'laps') sortedData.sort((a, b) => b.laps - a.laps);
-      else if(sortType === 'time') sortedData.sort((a, b) => b.time.localeCompare(a.time));
-      renderList(sortedData);
+      sessionStorage.setItem('sortType', e.target.value);
+      applySortAndSearch();
+    });
+
+    // ★ カテゴリー選択時の記憶処理を追加
+    document.getElementById('categorySelect').addEventListener('change', function(e) {
+      sessionStorage.setItem('categoryType', e.target.value);
+      applySortAndSearch();
     });
   </script>
 </body>
