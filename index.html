@@ -51,10 +51,10 @@
   
   <div class="notice-box">
     ⚠️ <strong>ご注意</strong><br>
-    本ページに表示されているデータは速報値であり、正式な最終結果を保証するものではありません。最終的な確定順位・記録につきましては、大会運営からの公式発表をご確認ください。
+    本ページに表示されているデータは速報値であり、正式な最終結果ではありません。
   </div>
 
-  <a href="1hour.html" class="nav-btn">⏱ 1時間経過時点の速報を見る</a>
+//  <a href="1hour.html" class="nav-btn">⏱ 1時間経過時点の速報を見る</a>
 
   <div class="control-panel">
     <button class="reload-btn" onclick="location.reload()">🔄 最新データに更新</button>
@@ -64,7 +64,6 @@
     
     <input type="number" id="searchInput" class="search-box" placeholder="🔍 チーム番号(No)を入力...">
     
-    <!-- ★ カテゴリー絞り込み用（データが存在する場合のみ表示されます） -->
     <select id="categorySelect" class="sort-select" style="margin-bottom: 10px; display: none;">
       <option value="all">すべてのカテゴリー</option>
     </select>
@@ -143,7 +142,6 @@
       Papa.parse(SUMMARY_CSV_URL, {
         download: true,
         complete: function(summaryRes) {
-          // ★ 修正: E列（5列目、インデックス4）をカテゴリーとして読み込む
           summaryData = summaryRes.data.slice(2).map(row => ({
             no: parseInt(row[0]) || 0,
             name: row[1] || '',
@@ -167,7 +165,6 @@
 
               document.getElementById('loading').style.display = 'none';
               
-              // ★ カテゴリーのドロップダウンリストを動的に生成
               const categories = [...new Set(summaryData.map(t => t.category).filter(c => c !== ''))];
               const catSelect = document.getElementById('categorySelect');
               if (categories.length > 0) {
@@ -236,12 +233,10 @@
       
       let sortedData = [...summaryData];
       
-      // ★ カテゴリーでの絞り込み処理
       if (categoryType !== 'all') {
         sortedData = sortedData.filter(t => t.category === categoryType);
       }
 
-      // 並び替え処理
       if(sortType === 'no') sortedData.sort((a, b) => a.no - b.no);
       else if(sortType === 'laps') sortedData.sort((a, b) => b.laps - a.laps);
       else if(sortType === 'time') sortedData.sort((a, b) => b.time.localeCompare(a.time));
@@ -281,16 +276,20 @@
     function createTeamCard(team, isHighlight) {
       const card = document.createElement('div');
       card.className = 'team-card' + (isHighlight ? ' highlight-card' : '');
-      const canvasId = 'chart-' + (isHighlight ? 'search-' : 'list-') + team.no;
+      
+      // ★修正: グラフ(canvas)と表(table)の両方に、検索結果か一覧かを区別するIDを付与
+      const prefix = isHighlight ? 'search-' : 'list-';
+      const canvasId = 'chart-' + prefix + team.no;
+      const tableId = 'log-table-' + prefix + team.no;
       
       const favs = getFavorites();
       const isFav = favs.includes(team.no);
       
-      // ★ カテゴリーがある場合はチーム名の下に小さく表示する
       const categoryBadge = team.category ? `<span style="display:inline-block; background:#e2e8f0; color:#4a5568; font-size:11px; padding:2px 6px; border-radius:4px; margin-bottom:4px;">${team.category}</span><br>` : '';
 
+      // ★修正: toggleDetailsに tableId も渡すように変更
       card.innerHTML = `
-        <div class="team-header" onclick="toggleDetails(this, ${team.no}, '${canvasId}')">
+        <div class="team-header" onclick="toggleDetails(this, ${team.no}, '${canvasId}', '${tableId}')">
           <div style="display: flex; align-items: center;">
             <div class="fav-btn ${isFav ? 'active' : ''}" onclick="toggleFavorite(event, ${team.no})">
               ${isFav ? '★' : '☆'}
@@ -306,7 +305,7 @@
         </div>
         <div class="team-details">
           <div class="table-scroll-container">
-            <table class="log-table" id="log-table-${team.no}">
+            <table class="log-table" id="${tableId}">
               <tr><th>周回</th><th>計測時刻</th><th>経過時間</th><th style="text-align:center;">写真</th></tr>
             </table>
           </div>
@@ -376,22 +375,24 @@
       });
     }
 
-    window.toggleDetails = function(element, teamNo, canvasId) {
+    // ★修正: 引数に tableId を追加
+    window.toggleDetails = function(element, teamNo, canvasId, tableId) {
       const detailsDiv = element.nextElementSibling;
       if (detailsDiv.style.display === 'block') {
         detailsDiv.style.display = 'none';
       } else {
         detailsDiv.style.display = 'block';
-        buildDetails(teamNo, canvasId);
+        buildDetails(teamNo, canvasId, tableId);
       }
     };
 
-    function buildDetails(teamNo, canvasId) {
+    // ★修正: 引数に tableId を追加し、getElementByIdで正しく表を取得
+    function buildDetails(teamNo, canvasId, tableId) {
       let teamLogs = historyLogs
         .filter(log => log.no === teamNo)
         .sort((a, b) => new Date(a.timeStr) - new Date(b.timeStr));
 
-      const table = document.getElementById(`log-table-${teamNo}`);
+      const table = document.getElementById(tableId);
       let tableHtml = '<tr><th>周回</th><th>計測時刻</th><th>経過時間</th><th style="text-align:center;">写真</th></tr>';
       
       const dataPoints = [{ x: 0, y: 0 }];
@@ -450,7 +451,6 @@
       applySortAndSearch();
     });
 
-    // ★ カテゴリー選択時の記憶処理を追加
     document.getElementById('categorySelect').addEventListener('change', function(e) {
       sessionStorage.setItem('categoryType', e.target.value);
       applySortAndSearch();
