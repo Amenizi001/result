@@ -54,7 +54,7 @@
     本ページに表示されているデータは速報値であり、正式な最終結果ではありません。
   </div>
 
-<!-- <a href="1hour.html" class="nav-btn">⏱ 1時間経過時点の速報を見る</a> -->
+  <!-- <a href="1hour.html" class="nav-btn">⏱ 1時間経過時点の速報を見る</a> -->
 
   <div class="control-panel">
     <button class="reload-btn" onclick="location.reload()">🔄 最新データに更新</button>
@@ -82,17 +82,21 @@
 
   <div id="loading">データを読み込み中...</div>
   
-  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加チーム一覧</h3>
-  
-  <div id="favTeamList"></div>
-  
-  <div id="favoriteArea" style="display: none; margin-top: 15px; margin-bottom: 15px;">
-    <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">⭐ お気に入りチームの比較グラフ</h3>
-    <div class="fav-chart-container">
-      <canvas id="favChart"></canvas>
+  <!-- ★ 修正: お気に入りエリアをまとめて上部に配置 -->
+  <div id="favSection" style="display: none;">
+    <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">⭐ お気に入りチーム一覧</h3>
+    <div id="favTeamList"></div>
+    
+    <div id="favoriteArea" style="margin-top: 15px; margin-bottom: 25px;">
+      <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">📊 お気に入りチームの比較グラフ</h3>
+      <div class="fav-chart-container">
+        <canvas id="favChart"></canvas>
+      </div>
     </div>
   </div>
-
+  
+  <!-- ★ 修正: その他の参加チーム一覧を一番下に配置 -->
+  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加チーム一覧</h3>
   <div id="otherTeamList"></div>
 
   <script>
@@ -244,6 +248,14 @@
       let favoriteTeams = sortedData.filter(t => favs.includes(t.no));
       let otherTeams = sortedData.filter(t => !favs.includes(t.no));
 
+      // ★ 修正: お気に入りチームの有無で、お気に入りセクション全体の表示・非表示を切り替え
+      const favSection = document.getElementById('favSection');
+      if (favoriteTeams.length > 0) {
+        favSection.style.display = 'block';
+      } else {
+        favSection.style.display = 'none';
+      }
+
       renderList(favoriteTeams, 'favTeamList');
       renderList(otherTeams, 'otherTeamList');
 
@@ -277,7 +289,6 @@
       const card = document.createElement('div');
       card.className = 'team-card' + (isHighlight ? ' highlight-card' : '');
       
-      // ★修正: グラフ(canvas)と表(table)の両方に、検索結果か一覧かを区別するIDを付与
       const prefix = isHighlight ? 'search-' : 'list-';
       const canvasId = 'chart-' + prefix + team.no;
       const tableId = 'log-table-' + prefix + team.no;
@@ -287,7 +298,6 @@
       
       const categoryBadge = team.category ? `<span style="display:inline-block; background:#e2e8f0; color:#4a5568; font-size:11px; padding:2px 6px; border-radius:4px; margin-bottom:4px;">${team.category}</span><br>` : '';
 
-      // ★修正: toggleDetailsに tableId も渡すように変更
       card.innerHTML = `
         <div class="team-header" onclick="toggleDetails(this, ${team.no}, '${canvasId}', '${tableId}')">
           <div style="display: flex; align-items: center;">
@@ -318,13 +328,9 @@
     }
 
     function drawFavoriteChart(favTeams) {
-      const favArea = document.getElementById('favoriteArea');
-      
       if (!favTeams || favTeams.length === 0) {
-        favArea.style.display = 'none';
-        return;
+        return; // お気に入りが無ければ何もしない
       }
-      favArea.style.display = 'block';
 
       if (favChartInstance) {
         favChartInstance.destroy();
@@ -375,7 +381,6 @@
       });
     }
 
-    // ★修正: 引数に tableId を追加
     window.toggleDetails = function(element, teamNo, canvasId, tableId) {
       const detailsDiv = element.nextElementSibling;
       if (detailsDiv.style.display === 'block') {
@@ -386,7 +391,6 @@
       }
     };
 
-    // ★修正: 引数に tableId を追加し、getElementByIdで正しく表を取得
     function buildDetails(teamNo, canvasId, tableId) {
       let teamLogs = historyLogs
         .filter(log => log.no === teamNo)
