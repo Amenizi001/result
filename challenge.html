@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>チャレンジ部門 - リレーマラソン速報</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    body { font-family: -apple-system, sans-serif; padding: 15px; background-color: #f4f6f8; margin: 0; }
+    .header { text-align: center; margin-bottom: 15px; }
+    .header h2 { margin-bottom: 5px; color: #2c3e50; }
+    .header .subtitle { font-size: 16px; color: #e74c3c; font-weight: bold; }
+    
+    .notice-box { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 12px 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; line-height: 1.5; }
+    
+    .control-panel { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .search-box { width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; }
+    .sort-select { width: 100%; padding: 10px; font-size: 14px; border-radius: 8px; }
+    
+    .reload-btn { width: 100%; padding: 12px; background: #3498db; color: white; border: none; font-size: 16px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .reload-btn:active { background: #2980b9; transform: translateY(1px); }
+    .reload-note { font-size: 11px; color: #7f8c8d; text-align: center; margin-bottom: 15px; }
+    
+    #searchResultArea { margin-bottom: 20px; display: none; }
+    .highlight-card { border: 2px solid #3498db; }
+    
+    .team-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: default; }
+    .team-header { display: flex; justify-content: space-between; align-items: center; }
+    
+    .team-name { font-size: 18px; font-weight: bold; margin: 0 0 5px 0; color: #222; }
+    
+    .nav-btn { display: block; width: 100%; padding: 12px; background: #34495e; color: white; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
+    #loading { text-align: center; color: #666; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>🏆 リレーマラソン速報</h2>
+    <div class="subtitle">【チャレンジ部門】</div>
+  </div>
+  
+  <div class="notice-box">
+    ⚠️ <strong>ご注意</strong><br>
+    本ページに表示されているデータは速報値であり、正式な最終結果を保証するものではありません。<br>
+    <span style="color: #d35400; font-weight: bold; margin-top: 5px; display: inline-block;">※ゴールタイム、ゴール時刻は手動計測による参考値です。</span>
+  </div>
+
+  <a href="index.html" class="nav-btn">🔙 総合速報（全カテゴリー）へ戻る</a>
+
+  <div class="control-panel">
+    <button class="reload-btn" onclick="location.reload()">🔄 最新データに更新</button>
+    <div class="reload-note">※システム反映まで数分かかる場合があります</div>
+    
+    <input type="number" id="searchInput" class="search-box" placeholder="🔍 番号(No)を入力...">
+
+    <select id="sortSelect" class="sort-select">
+      <option value="no">番号順</option>
+      <option value="time">ゴールタイムが速い順</option>
+    </select>
+  </div>
+
+  <div id="searchResultArea">
+    <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">検索結果</h3>
+    <div id="searchResultCard"></div>
+  </div>
+
+  <div id="loading">データを読み込み中...</div>
+  
+  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加チーム一覧</h3>
+  <div id="teamList"></div>
+
+  <script>
+    // ==========================================
+    // ★ チャレンジ部門用のCSV（いただいたURLです） ★
+    // ==========================================
+    const SUMMARY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQNae9bmQ0II-29rv7Lug7echExKNiMX9yhVH_NdjtlvpF2zfNQ2-DSBqYKU7vxG5B2FOyqxBCfIi9/pub?output=csv'; 
+    // ==========================================
+
+    let summaryData = [];
+
+    window.onload = function() {
+      Papa.parse(SUMMARY_CSV_URL, {
+        download: true,
+        complete: function(summaryRes) {
+          summaryData = summaryRes.data.slice(2).map(row => ({
+            no: parseInt(row[0]) || 0,
+            name: row[1] || '',
+            goalTime: row[2] ? row[2].trim() : '',
+            clockTime: row[3] ? row[3].trim() : ''
+          })).filter(team => team.name !== '');
+
+          document.getElementById('loading').style.display = 'none';
+          restoreStateAndRender();
+        }
+      });
+    };
+
+    function restoreStateAndRender() {
+      const savedSort = sessionStorage.getItem('challenge_sortType');
+      if (savedSort) {
+        document.getElementById('sortSelect').value = savedSort;
+      }
+      const savedSearch = sessionStorage.getItem('challenge_searchKeyword');
+      if (savedSearch) {
+        document.getElementById('searchInput').value = savedSearch;
+      }
+      applySortAndSearch();
+    }
+
+    function applySortAndSearch() {
+      const sortType = document.getElementById('sortSelect').value;
+      const keyword = document.getElementById('searchInput').value;
+      
+      let sortedData = [...summaryData];
+
+      if (sortType === 'no') {
+        sortedData.sort((a, b) => a.no - b.no);
+      } else if (sortType === 'time') {
+        sortedData.sort((a, b) => {
+          const aIsText = a.goalTime === 'DNS' || a.goalTime === 'DNF' || a.goalTime === '';
+          const bIsText = b.goalTime === 'DNS' || b.goalTime === 'DNF' || b.goalTime === '';
+          
+          if (aIsText && !bIsText) return 1;
+          if (!aIsText && bIsText) return -1;
+          if (aIsText && bIsText) return 0;
+          
+          return a.goalTime.localeCompare(b.goalTime);
+        });
+      }
+
+      renderList(sortedData, 'teamList');
+
+      const searchArea = document.getElementById('searchResultArea');
+      const searchCardContainer = document.getElementById('searchResultCard');
+      if(keyword === '') {
+        searchArea.style.display = 'none';
+      } else {
+        const targetTeam = summaryData.find(t => t.no.toString() === keyword);
+        if(targetTeam) {
+          searchArea.style.display = 'block';
+          searchCardContainer.innerHTML = '';
+          searchCardContainer.appendChild(createTeamCard(targetTeam, true));
+        } else {
+          searchArea.style.display = 'none';
+        }
+      }
+    }
+
+    function renderList(teams, containerId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      teams.forEach(team => {
+        container.appendChild(createTeamCard(team, false));
+      });
+    }
+
+    function createTeamCard(team, isHighlight) {
+      const card = document.createElement('div');
+      card.className = 'team-card' + (isHighlight ? ' highlight-card' : '');
+      
+      let resultHtml = '';
+      
+      if (team.goalTime.toUpperCase() === 'DNS' || team.goalTime.toUpperCase() === 'DNF') {
+        resultHtml = `<div style="font-size: 24px; font-weight: bold; color: #e74c3c;">${team.goalTime}</div>`;
+      } else if (team.goalTime === '') {
+        resultHtml = `<div style="font-size: 14px; color: #999;">走行中...</div>`;
+      } else {
+        resultHtml = `
+          <div style="text-align: right;">
+            <div style="font-size: 20px; font-weight: bold; color: #2c3e50;">${team.goalTime}</div>
+            <div style="font-size: 12px; color: #777;">ゴール時刻: ${team.clockTime || '-'}</div>
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div class="team-header">
+          <div style="display: flex; align-items: center;">
+            <div>
+              <div style="font-size:12px; color:#777;">No.${team.no}</div>
+              <div class="team-name">${team.name}</div>
+            </div>
+          </div>
+          ${resultHtml}
+        </div>
+      `;
+      return card;
+    }
+
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      sessionStorage.setItem('challenge_searchKeyword', e.target.value);
+      applySortAndSearch();
+    });
+
+    document.getElementById('sortSelect').addEventListener('change', function(e) {
+      sessionStorage.setItem('challenge_sortType', e.target.value);
+      applySortAndSearch();
+    });
+  </script>
+</body>
+</html>
