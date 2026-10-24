@@ -81,24 +81,28 @@
         download: true,
         complete: function(summaryRes) {
           
-          // H2（行インデックス1、列インデックス7）からスタート時刻を取得
-          let startDtStr = summaryRes.data[1] && summaryRes.data[1][7] ? summaryRes.data[1][7].trim() : '';
+          // H2（行インデックス1、列インデックス7）からスタート時刻を取得。余計な文字も除去
+          let startDtStr = summaryRes.data[1] && summaryRes.data[1][7] ? summaryRes.data[1][7].trim().replace(/^'/, '') : '';
           let globalStartDt = startDtStr ? new Date(startDtStr) : new Date();
+
+          if (isNaN(globalStartDt.getTime())) {
+            globalStartDt = new Date(); // 万が一スタート時刻が不正な場合は現在時刻（エラー回避）
+          }
 
           // 2行目(index 1)からデータを読み込む
           summaryData = summaryRes.data.slice(1).map(row => {
-            let no = parseInt(row[0]) || 0; // A列: 番号
-            let noStr = String(no).padStart(3, '0'); // 番号を3桁表示にゼロ埋め
+            let no = parseInt(row[0]) || 0; 
+            let noStr = String(no).padStart(3, '0'); 
             
-            let isStart = String(row[1]).trim().toUpperCase() === 'TRUE'; // B列: スタート
-            let isGoal = String(row[2]).trim().toUpperCase() === 'TRUE';  // C列: ゴール
-            let clockTime = row[3] ? row[3].trim() : '';                  // D列: ゴール時刻
-            let isDnf = String(row[4]).trim().toUpperCase() === 'TRUE';   // E列: DNF
-            let isDns = String(row[5]).trim().toUpperCase() === 'TRUE';   // F列: DNS
+            let isStart = String(row[1]).trim().toUpperCase() === 'TRUE'; 
+            let isGoal = String(row[2]).trim().toUpperCase() === 'TRUE';  
+            let clockTime = row[3] ? row[3].trim().replace(/^'/, '') : ''; // ★先頭のシングルクォーテーションを除去
+            let isDnf = String(row[4]).trim().toUpperCase() === 'TRUE';   
+            let isDns = String(row[5]).trim().toUpperCase() === 'TRUE';   
 
             let status = '';
             let goalTimeStr = '';
-            let elapsedMs = Infinity; // ソート用に未ゴールは無限大にする
+            let elapsedMs = Infinity; 
 
             if (isDns) {
               status = '棄権（DNS）';
@@ -107,25 +111,35 @@
             } else if (isGoal && clockTime) {
               status = 'ゴール';
               
-              // ゴールタイムを計算（日付跨ぎなし）
+              // ゴールタイムを計算
               let timeParts = clockTime.split(':');
               let goalDt = new Date(globalStartDt.getTime());
+              
               if (timeParts.length >= 2) {
-                goalDt.setHours(parseInt(timeParts[0], 10) || 0);
-                goalDt.setMinutes(parseInt(timeParts[1], 10) || 0);
-                goalDt.setSeconds(parseInt(timeParts[2], 10) || 0);
+                // 文字列に記号が混じっていても数字だけを取り出して計算する安全処理
+                let hrs = parseInt(timeParts[0].replace(/[^0-9]/g, ''), 10) || 0;
+                let mins = parseInt(timeParts[1].replace(/[^0-9]/g, ''), 10) || 0;
+                let secs = parseInt(timeParts[2] ? timeParts[2].replace(/[^0-9]/g, '') : '0', 10) || 0;
+                
+                goalDt.setHours(hrs);
+                goalDt.setMinutes(mins);
+                goalDt.setSeconds(secs);
               }
               
               elapsedMs = goalDt - globalStartDt;
               
-              let h = Math.floor(elapsedMs / 3600000);
-              let m = Math.floor((elapsedMs % 3600000) / 60000);
-              let s = Math.floor((elapsedMs % 60000) / 1000);
-              
-              if (h > 0) {
-                goalTimeStr = `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+              if (!isNaN(elapsedMs)) {
+                let h = Math.floor(elapsedMs / 3600000);
+                let m = Math.floor((elapsedMs % 3600000) / 60000);
+                let s = Math.floor((elapsedMs % 60000) / 1000);
+                
+                if (h > 0) {
+                  goalTimeStr = `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                } else {
+                  goalTimeStr = `${m}:${String(s).padStart(2, '0')}`;
+                }
               } else {
-                goalTimeStr = `${m}:${String(s).padStart(2, '0')}`;
+                goalTimeStr = '計算エラー';
               }
             } else if (isStart) {
               status = '参加';
@@ -163,7 +177,6 @@
       if (sortType === 'no') {
         sortedData.sort((a, b) => a.no - b.no);
       } else if (sortType === 'time') {
-        // タイムが早い順（未ゴール・DNS/DNFは一番下へ）
         sortedData.sort((a, b) => a.elapsedMs - b.elapsedMs);
       }
 
