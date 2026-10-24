@@ -27,8 +27,6 @@
     .team-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: default; }
     .team-header { display: flex; justify-content: space-between; align-items: center; }
     
-    .team-name { font-size: 18px; font-weight: bold; margin: 0 0 5px 0; color: #222; }
-    
     .nav-btn { display: block; width: 100%; padding: 12px; background: #34495e; color: white; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
     #loading { text-align: center; color: #666; font-weight: bold; }
   </style>
@@ -51,10 +49,10 @@
     <button class="reload-btn" onclick="location.reload()">🔄 最新データに更新</button>
     <div class="reload-note">※システム反映まで数分かかる場合があります</div>
     
-    <input type="number" id="searchInput" class="search-box" placeholder="🔍 番号(No)を入力...">
+    <input type="number" id="searchInput" class="search-box" placeholder="🔍 チーム番号(No)を入力...">
 
     <select id="sortSelect" class="sort-select">
-      <option value="no">番号順</option>
+      <option value="no">チーム番号順</option>
       <option value="time">ゴールタイムが速い順</option>
     </select>
   </div>
@@ -71,7 +69,7 @@
 
   <script>
     // ==========================================
-    // ★ チャレンジ部門用のCSV（いただいたURLです） ★
+    // ★ チャレンジ部門用のCSVURL ★
     // ==========================================
     const SUMMARY_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQNae9bmQ0II-29rv7Lug7echExKNiMX9yhVH_NdjtlvpF2zfNQ2-DSBqYKU7vxG5B2FOyqxBCfIi9/pub?output=csv'; 
     // ==========================================
@@ -82,12 +80,62 @@
       Papa.parse(SUMMARY_CSV_URL, {
         download: true,
         complete: function(summaryRes) {
-          summaryData = summaryRes.data.slice(2).map(row => ({
-            no: parseInt(row[0]) || 0,
-            name: row[1] || '',
-            goalTime: row[2] ? row[2].trim() : '',
-            clockTime: row[3] ? row[3].trim() : ''
-          })).filter(team => team.name !== '');
+          
+          // H2（行インデックス1、列インデックス7）からスタート時刻を取得
+          let startDtStr = summaryRes.data[1] && summaryRes.data[1][7] ? summaryRes.data[1][7].trim() : '';
+          let globalStartDt = startDtStr ? new Date(startDtStr) : new Date();
+
+          // 2行目(index 1)からデータを読み込む
+          summaryData = summaryRes.data.slice(1).map(row => {
+            let no = parseInt(row[0]) || 0; // A列: 番号
+            let noStr = String(no).padStart(3, '0'); // ★番号を3桁表示にゼロ埋め
+            
+            let isStart = String(row[1]).trim().toUpperCase() === 'TRUE'; // B列: スタート
+            let isGoal = String(row[2]).trim().toUpperCase() === 'TRUE';  // C列: ゴール
+            let clockTime = row[3] ? row[3].trim() : '';                  // D列: ゴール時刻
+            let isDnf = String(row[4]).trim().toUpperCase() === 'TRUE';   // E列: DNF
+            let isDns = String(row[5]).trim().toUpperCase() === 'TRUE';   // F列: DNS
+
+            let status = '';
+            let goalTimeStr = '';
+            let elapsedMs = Infinity; // ソート用に未ゴールは無限大にする
+
+            if (isDns) {
+              status = '棄権（DNS）';
+            } else if (isDnf) {
+              status = '棄権（DNF）';
+            } else if (isGoal && clockTime) {
+              status = 'ゴール';
+              
+              // ゴールタイムを計算
+              let timeParts = clockTime.split(':');
+              let goalDt = new Date(globalStartDt.getTime());
+              if (timeParts.length >= 2) {
+                goalDt.setHours(parseInt(timeParts[0], 10) || 0);
+                goalDt.setMinutes(parseInt(timeParts[1], 10) || 0);
+                goalDt.setSeconds(parseInt(timeParts[2], 10) || 0);
+              }
+              
+              elapsedMs = goalDt - globalStartDt;
+              if (elapsedMs < 0) elapsedMs += 24 * 3600 * 1000; // 日またぎの保険処理
+              
+              let h = Math.floor(elapsedMs / 3600000);
+              let m = Math.floor((elapsedMs % 3600000) / 60000);
+              let s = Math.floor((elapsedMs % 60000) / 1000);
+              
+              if (h > 0) {
+                goalTimeStr = `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+              } else {
+                goalTimeStr = `${m}:${String(s).padStart(2, '0')}`;
+              }
+            } else if (isStart) {
+              status = 'スタート済';
+            } else {
+              status = '未スタート';
+            }
+
+            return { no, noStr, isStart, isGoal, clockTime, isDnf, isDns, status, goalTimeStr, elapsedMs };
+          }).filter(team => team.no > 0);
 
           document.getElementById('loading').style.display = 'none';
           restoreStateAndRender();
@@ -116,16 +164,8 @@
       if (sortType === 'no') {
         sortedData.sort((a, b) => a.no - b.no);
       } else if (sortType === 'time') {
-        sortedData.sort((a, b) => {
-          const aIsText = a.goalTime === 'DNS' || a.goalTime === 'DNF' || a.goalTime === '';
-          const bIsText = b.goalTime === 'DNS' || b.goalTime === 'DNF' || b.goalTime === '';
-          
-          if (aIsText && !bIsText) return 1;
-          if (!aIsText && bIsText) return -1;
-          if (aIsText && bIsText) return 0;
-          
-          return a.goalTime.localeCompare(b.goalTime);
-        });
+        // タイムが早い順（未ゴール・DNS/DNFは一番下へ）
+        sortedData.sort((a, b) => a.elapsedMs - b.elapsedMs);
       }
 
       renderList(sortedData, 'teamList');
@@ -135,7 +175,9 @@
       if(keyword === '') {
         searchArea.style.display = 'none';
       } else {
-        const targetTeam = summaryData.find(t => t.no.toString() === keyword);
+        // ★検索時は数値として比較するため、001でも1でもヒットします
+        const searchNo = parseInt(keyword, 10);
+        const targetTeam = summaryData.find(t => t.no === searchNo);
         if(targetTeam) {
           searchArea.style.display = 'block';
           searchCardContainer.innerHTML = '';
@@ -160,27 +202,24 @@
       
       let resultHtml = '';
       
-      if (team.goalTime.toUpperCase() === 'DNS' || team.goalTime.toUpperCase() === 'DNF') {
-        resultHtml = `<div style="font-size: 24px; font-weight: bold; color: #e74c3c;">${team.goalTime}</div>`;
-      } else if (team.goalTime === '') {
-        resultHtml = `<div style="font-size: 14px; color: #999;">走行中...</div>`;
-      } else {
+      if (team.status === '棄権（DNS）' || team.status === '棄権（DNF）') {
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #e74c3c;">${team.status}</div>`;
+      } else if (team.status === 'ゴール') {
         resultHtml = `
-          <div style="text-align: right;">
-            <div style="font-size: 20px; font-weight: bold; color: #2c3e50;">${team.goalTime}</div>
-            <div style="font-size: 12px; color: #777;">ゴール時刻: ${team.clockTime || '-'}</div>
+          <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
+            <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">ﾀｲﾑ: ${team.goalTimeStr}</div>
+            <div style="font-size: 18px; font-weight: bold; color: #7f8c8d;">時刻: ${team.clockTime}</div>
           </div>
         `;
+      } else if (team.status === 'スタート済') {
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #27ae60;">スタート済</div>`;
+      } else {
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #ccc;">待機中</div>`;
       }
 
       card.innerHTML = `
         <div class="team-header">
-          <div style="display: flex; align-items: center;">
-            <div>
-              <div style="font-size:12px; color:#777;">No.${team.no}</div>
-              <div class="team-name">${team.name}</div>
-            </div>
-          </div>
+          <div style="font-size: 18px; font-weight: bold; color: #222;">No.${team.noStr}</div>
           ${resultHtml}
         </div>
       `;
