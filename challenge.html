@@ -43,16 +43,16 @@
     <span style="color: #d35400; font-weight: bold; margin-top: 5px; display: inline-block;">※ゴールタイム、ゴール時刻は手動計測による参考値です。</span>
   </div>
 
-  <a href="index.html" class="nav-btn">🔙 総合速報（全カテゴリー）へ戻る</a>
+  <a href="index.html" class="nav-btn">🔙 リレー速報へ戻る</a>
 
   <div class="control-panel">
     <button class="reload-btn" onclick="location.reload()">🔄 最新データに更新</button>
     <div class="reload-note">※システム反映まで数分かかる場合があります</div>
     
-    <input type="number" id="searchInput" class="search-box" placeholder="🔍 チーム番号(No)を入力...">
+    <input type="number" id="searchInput" class="search-box" placeholder="🔍 番号を入力...">
 
     <select id="sortSelect" class="sort-select">
-      <option value="no">チーム番号順</option>
+      <option value="no">番号順</option>
       <option value="time">ゴールタイムが速い順</option>
     </select>
   </div>
@@ -64,7 +64,7 @@
 
   <div id="loading">データを読み込み中...</div>
   
-  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加チーム一覧</h3>
+  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加者一覧</h3>
   <div id="teamList"></div>
 
   <script>
@@ -88,7 +88,7 @@
           // 2行目(index 1)からデータを読み込む
           summaryData = summaryRes.data.slice(1).map(row => {
             let no = parseInt(row[0]) || 0; // A列: 番号
-            let noStr = String(no).padStart(3, '0'); // ★番号を3桁表示にゼロ埋め
+            let noStr = String(no).padStart(3, '0'); // 番号を3桁表示にゼロ埋め
             
             let isStart = String(row[1]).trim().toUpperCase() === 'TRUE'; // B列: スタート
             let isGoal = String(row[2]).trim().toUpperCase() === 'TRUE';  // C列: ゴール
@@ -107,7 +107,7 @@
             } else if (isGoal && clockTime) {
               status = 'ゴール';
               
-              // ゴールタイムを計算
+              // ゴールタイムを計算（日付跨ぎなし）
               let timeParts = clockTime.split(':');
               let goalDt = new Date(globalStartDt.getTime());
               if (timeParts.length >= 2) {
@@ -117,7 +117,6 @@
               }
               
               elapsedMs = goalDt - globalStartDt;
-              if (elapsedMs < 0) elapsedMs += 24 * 3600 * 1000; // 日またぎの保険処理
               
               let h = Math.floor(elapsedMs / 3600000);
               let m = Math.floor((elapsedMs % 3600000) / 60000);
@@ -129,9 +128,9 @@
                 goalTimeStr = `${m}:${String(s).padStart(2, '0')}`;
               }
             } else if (isStart) {
-              status = 'スタート済';
+              status = '参加';
             } else {
-              status = '未スタート';
+              status = '－';
             }
 
             return { no, noStr, isStart, isGoal, clockTime, isDnf, isDns, status, goalTimeStr, elapsedMs };
@@ -175,7 +174,6 @@
       if(keyword === '') {
         searchArea.style.display = 'none';
       } else {
-        // ★検索時は数値として比較するため、001でも1でもヒットします
         const searchNo = parseInt(keyword, 10);
         const targetTeam = summaryData.find(t => t.no === searchNo);
         if(targetTeam) {
@@ -211,10 +209,10 @@
             <div style="font-size: 18px; font-weight: bold; color: #7f8c8d;">時刻: ${team.clockTime}</div>
           </div>
         `;
-      } else if (team.status === 'スタート済') {
-        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #27ae60;">スタート済</div>`;
+      } else if (team.status === '参加') {
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #27ae60;">参加</div>`;
       } else {
-        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #ccc;">待機中</div>`;
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #ccc;">－</div>`;
       }
 
       card.innerHTML = `
