@@ -76,32 +76,38 @@
 
     let summaryData = [];
 
+    // 半角数字を全角数字に変換する関数
+    function toFullWidth(num) {
+      return String(num).replace(/[0-9]/g, function(s) {
+        return String.fromCharCode(s.charCodeAt(0) + 0xFEE0);
+      });
+    }
+
     window.onload = function() {
       Papa.parse(SUMMARY_CSV_URL, {
         download: true,
         complete: function(summaryRes) {
           
-          // H2（行インデックス1、列インデックス7）からスタート時刻を取得。余計な文字も除去
           let startDtStr = summaryRes.data[1] && summaryRes.data[1][7] ? summaryRes.data[1][7].trim().replace(/^'/, '') : '';
           let globalStartDt = startDtStr ? new Date(startDtStr) : new Date();
 
           if (isNaN(globalStartDt.getTime())) {
-            globalStartDt = new Date(); // 万が一スタート時刻が不正な場合は現在時刻（エラー回避）
+            globalStartDt = new Date(); 
           }
 
-          // 2行目(index 1)からデータを読み込む
           summaryData = summaryRes.data.slice(1).map(row => {
             let no = parseInt(row[0]) || 0; 
             let noStr = String(no).padStart(3, '0'); 
             
             let isStart = String(row[1]).trim().toUpperCase() === 'TRUE'; 
             let isGoal = String(row[2]).trim().toUpperCase() === 'TRUE';  
-            let clockTime = row[3] ? row[3].trim().replace(/^'/, '') : ''; // ★先頭のシングルクォーテーションを除去
+            let clockTime = row[3] ? row[3].trim().replace(/^'/, '') : ''; 
             let isDnf = String(row[4]).trim().toUpperCase() === 'TRUE';   
             let isDns = String(row[5]).trim().toUpperCase() === 'TRUE';   
 
             let status = '';
             let goalTimeStr = '';
+            let formattedClockTime = clockTime; // 表示用のゴール時刻
             let elapsedMs = Infinity; 
 
             if (isDns) {
@@ -111,12 +117,10 @@
             } else if (isGoal && clockTime) {
               status = 'ゴール';
               
-              // ゴールタイムを計算
               let timeParts = clockTime.split(':');
               let goalDt = new Date(globalStartDt.getTime());
               
               if (timeParts.length >= 2) {
-                // 文字列に記号が混じっていても数字だけを取り出して計算する安全処理
                 let hrs = parseInt(timeParts[0].replace(/[^0-9]/g, ''), 10) || 0;
                 let mins = parseInt(timeParts[1].replace(/[^0-9]/g, ''), 10) || 0;
                 let secs = parseInt(timeParts[2] ? timeParts[2].replace(/[^0-9]/g, '') : '0', 10) || 0;
@@ -124,6 +128,15 @@
                 goalDt.setHours(hrs);
                 goalDt.setMinutes(mins);
                 goalDt.setSeconds(secs);
+
+                // ▼ ゴール時刻を YYYY-MM-DD HH:MM:SS にフォーマット
+                let yyyy = goalDt.getFullYear();
+                let mm = String(goalDt.getMonth() + 1).padStart(2, '0');
+                let dd = String(goalDt.getDate()).padStart(2, '0');
+                let hhStr = String(goalDt.getHours()).padStart(2, '0');
+                let minStr = String(goalDt.getMinutes()).padStart(2, '0');
+                let secStr = String(goalDt.getSeconds()).padStart(2, '0');
+                formattedClockTime = `${yyyy}-${mm}-${dd} ${hhStr}:${minStr}:${secStr}`;
               }
               
               elapsedMs = goalDt - globalStartDt;
@@ -133,10 +146,11 @@
                 let m = Math.floor((elapsedMs % 3600000) / 60000);
                 let s = Math.floor((elapsedMs % 60000) / 1000);
                 
+                // ▼ ゴールタイムを全角に変換して組み立て（ゼロ埋めなし）
                 if (h > 0) {
-                  goalTimeStr = `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                  goalTimeStr = `${toFullWidth(h)}時間${toFullWidth(m)}分${toFullWidth(s)}秒`;
                 } else {
-                  goalTimeStr = `${m}:${String(s).padStart(2, '0')}`;
+                  goalTimeStr = `${toFullWidth(m)}分${toFullWidth(s)}秒`;
                 }
               } else {
                 goalTimeStr = '計算エラー';
@@ -147,7 +161,8 @@
               status = '－';
             }
 
-            return { no, noStr, isStart, isGoal, clockTime, isDnf, isDns, status, goalTimeStr, elapsedMs };
+            // clockTime にフォーマット済みの時刻を渡す
+            return { no, noStr, isStart, isGoal, clockTime: formattedClockTime, isDnf, isDns, status, goalTimeStr, elapsedMs };
           }).filter(team => team.no > 0);
 
           document.getElementById('loading').style.display = 'none';
