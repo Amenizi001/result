@@ -38,21 +38,20 @@
   </div>
   
   <div class="notice-box">
-    ⚠️本ページは速報です。正式な最終結果ではありません。<br>
-    <span style="color: #d35400; font-weight: bold; margin-top: 5px; display: inline-block;">※計測は手動で実施しています。</span>
+    ⚠️本ページは速報です。正式な最終結果ではありません。
   </div>
 
-  <a href="index.html" class="nav-btn">🔙 リレー速報を見る</a>
+  <a href="index.html" class="nav-btn">🔙 リレーのけっかをみる</a>
 
   <div class="control-panel">
-    <button class="reload-btn" onclick="location.reload()">🔄 ゴールしたのに　けっかがみれなかったらおしてみて</button>
-    <div class="reload-note">※ゴールしてもすぐにはけっかがみれません</div>
+    <button class="reload-btn" onclick="location.reload()">🔄 あたらしいデータをうけとる</button>
+    <div class="reload-note">※ゴールしてすこししてからみてみてね</div>
     
     <input type="number" id="searchInput" class="search-box" placeholder="🔍 しりたいばんごうをいれる...">
 
     <select id="sortSelect" class="sort-select">
-      <option value="no">ばんごうじゅん</option>
-      <option value="time">ゴールしたじゅん</option>
+      <option value="no">ばんごうじゅんにみる</option>
+      <option value="time">ゴールしたじゅんにみる</option>
     </select>
   </div>
 
@@ -261,8 +260,8 @@
       } else if (team.status === 'ゴール') {
         resultHtml = `
           <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
-            <div style="font-size: 20px; font-weight: bold; color: #2c3e50;">タイム: ${team.goalTimeStr}</div>
-            <div style="font-size: 12px; font-weight: bold; color: #7f8c8d;">ゴール時刻: ${team.clockTime}</div>
+            <div style="font-size: 19px; font-weight: bold; color: #2c3e50;">タイム: ${team.goalTimeStr}</div>
+            <div style="font-size: 12px; font-weight: bold; color: #7f8c8d;">ゴール: ${team.clockTime}</div>
           </div>
         `;
       } else if (team.status === '参加') {
@@ -275,7 +274,7 @@
 
       card.innerHTML = `
         <div class="team-header">
-          <div style="font-size: 22px; font-weight: bold; color: #222;">No.${team.noStr}</div>
+          <div style="font-size: 22px; font-weight: bold; color: #222;">${team.noStr}</div>
           ${resultHtml}
         </div>
       `;
