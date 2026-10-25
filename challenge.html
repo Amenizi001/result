@@ -107,7 +107,7 @@
 
             let status = '';
             let goalTimeStr = '';
-            let formattedClockTime = clockTime; // 表示用のゴール時刻
+            let formattedClockTime = clockTime;
             let elapsedMs = Infinity; 
 
             if (isDns) {
@@ -117,36 +117,43 @@
             } else if (isGoal && clockTime) {
               status = 'ゴール';
               
-              let timeParts = clockTime.split(':');
-              let goalDt = new Date(globalStartDt.getTime());
+              // ▼ 修正部分：CSVのデータから直接正確な日付オブジェクトを作成
+              let goalDt = new Date(clockTime);
               
-              if (timeParts.length >= 2) {
-                let hrs = parseInt(timeParts[0].replace(/[^0-9]/g, ''), 10) || 0;
-                let mins = parseInt(timeParts[1].replace(/[^0-9]/g, ''), 10) || 0;
-                let secs = parseInt(timeParts[2] ? timeParts[2].replace(/[^0-9]/g, '') : '0', 10) || 0;
+              // 万が一「09:48:25」のように時刻しかなく、Date変換に失敗した時のための安全処理
+              if (isNaN(goalDt.getTime())) {
+                goalDt = new Date(globalStartDt.getTime());
+                let timeString = clockTime.includes(' ') ? clockTime.split(' ').pop() : clockTime;
+                let timeParts = timeString.split(':');
                 
-                goalDt.setHours(hrs);
-                goalDt.setMinutes(mins);
-                goalDt.setSeconds(secs);
-
-                // ▼ ゴール時刻を YYYY-MM-DD HH:MM:SS にフォーマット
-                let yyyy = goalDt.getFullYear();
-                let mm = String(goalDt.getMonth() + 1).padStart(2, '0');
-                let dd = String(goalDt.getDate()).padStart(2, '0');
-                let hhStr = String(goalDt.getHours()).padStart(2, '0');
-                let minStr = String(goalDt.getMinutes()).padStart(2, '0');
-                let secStr = String(goalDt.getSeconds()).padStart(2, '0');
-                formattedClockTime = `${yyyy}-${mm}-${dd} ${hhStr}:${minStr}:${secStr}`;
+                if (timeParts.length >= 2) {
+                  let hrs = parseInt(timeParts[0].replace(/[^0-9]/g, ''), 10) || 0;
+                  let mins = parseInt(timeParts[1].replace(/[^0-9]/g, ''), 10) || 0;
+                  let secs = parseInt(timeParts[2] ? timeParts[2].replace(/[^0-9]/g, '') : '0', 10) || 0;
+                  
+                  goalDt.setHours(hrs);
+                  goalDt.setMinutes(mins);
+                  goalDt.setSeconds(secs);
+                }
               }
+
+              // ▼ ゴール時刻を YYYY-MM-DD HH:MM:SS にフォーマット
+              let yyyy = goalDt.getFullYear();
+              let mm = String(goalDt.getMonth() + 1).padStart(2, '0');
+              let dd = String(goalDt.getDate()).padStart(2, '0');
+              let hhStr = String(goalDt.getHours()).padStart(2, '0');
+              let minStr = String(goalDt.getMinutes()).padStart(2, '0');
+              let secStr = String(goalDt.getSeconds()).padStart(2, '0');
+              formattedClockTime = `${yyyy}-${mm}-${dd} ${hhStr}:${minStr}:${secStr}`;
               
               elapsedMs = goalDt - globalStartDt;
               
-              if (!isNaN(elapsedMs)) {
+              if (!isNaN(elapsedMs) && elapsedMs >= 0) {
                 let h = Math.floor(elapsedMs / 3600000);
                 let m = Math.floor((elapsedMs % 3600000) / 60000);
                 let s = Math.floor((elapsedMs % 60000) / 1000);
                 
-                // ▼ ゴールタイムを全角に変換して組み立て（ゼロ埋めなし）
+                // ▼ ゴールタイムを全角に変換して組み立て
                 if (h > 0) {
                   goalTimeStr = `${toFullWidth(h)}時間${toFullWidth(m)}分${toFullWidth(s)}秒`;
                 } else {
@@ -161,7 +168,6 @@
               status = '－';
             }
 
-            // clockTime にフォーマット済みの時刻を渡す
             return { no, noStr, isStart, isGoal, clockTime: formattedClockTime, isDnf, isDns, status, goalTimeStr, elapsedMs };
           }).filter(team => team.no > 0);
 
