@@ -256,18 +256,18 @@
       let resultHtml = '';
       
       if (team.status === '棄権（DNS）' ) {
-        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #e74c3c;">ナイスチャレンジ</div>`;
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #e74c3c;">🏅ナイスチャレンジ</div>`;
       } else if (team.status === 'ゴール') {
         resultHtml = `
           <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
-            <div style="font-size: 19px; font-weight: bold; color: #2c3e50;">タイム: ${team.goalTimeStr}</div>
+            <div style="font-size: 19px; font-weight: bold; color: #2c3e50;">🎉 ${team.goalTimeStr}</div>
             <div style="font-size: 12px; font-weight: bold; color: #7f8c8d;">ゴール: ${team.clockTime}</div>
           </div>
         `;
       } else if (team.status === '参加') {
-        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #27ae60;">さんかちゅう</div>`;
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #27ae60;">🏃さんかちゅう</div>`;
       } else if (team.status === '棄権（DNF）') {
-        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #e74c3c;">がんばりました</div>`;        
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #e74c3c;">🏅がんばりました</div>`;        
       } else {
         resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #ccc;">－</div>`;
       }
