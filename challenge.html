@@ -22,9 +22,34 @@
     .reload-note { font-size: 11px; color: #7f8c8d; text-align: center; margin-bottom: 15px; }
     
     #searchResultArea { margin-bottom: 20px; display: none; }
-    .highlight-card { border: 2px solid #3498db; }
     
-    .team-card { background: white; padding: 15px; margin-bottom: 12px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: default; }
+    .team-card { 
+      background: white; 
+      padding: 15px; 
+      margin-bottom: 12px; 
+      border-radius: 10px; 
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+      cursor: default; 
+      border: 2px solid transparent; /* 枠のガタつきを防止 */
+      transition: all 0.3s ease; /* 少しフワッと色が変わるように */
+    }
+
+    /* ▼▼ ステータスごとの枠と背景色 ▼▼ */
+    .status-goal { 
+      border-color: #f39c12; /* ゴール・DNS・DNFはオレンジ（ゴールド）枠 */
+      background-color: #fffbf2; /* ほんのりオレンジ背景 */
+    }
+    .status-running { 
+      border-color: #27ae60; /* 走っている途中は緑枠 */
+      background-color: #f4fdf8; /* ほんのり緑背景 */
+    }
+
+    /* 検索結果ハイライト用（優先させるため!important） */
+    .highlight-card { 
+      border-color: #3498db !important; 
+      background-color: #f4f9fd !important; 
+    }
+
     .team-header { display: flex; justify-content: space-between; align-items: center; }
     
     .nav-btn { display: block; width: 100%; padding: 12px; background: #34495e; color: white; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
@@ -86,7 +111,7 @@
         download: true,
         complete: function(summaryRes) {
           
-          // ▼ 修正: H3セル（行インデックス2）からスタート時刻を取得
+          // H3セル（行インデックス2）からスタート時刻を取得
           let startDtStr = '';
           if (summaryRes.data[2] && summaryRes.data[2][7]) {
             startDtStr = summaryRes.data[2][7].trim().replace(/^'/, '');
@@ -161,7 +186,7 @@
               let secStr = String(goalDt.getSeconds()).padStart(2, '0');
               formattedClockTime = `${yyyy}-${mm}-${dd} ${hhStr}:${minStr}:${secStr}`;
               
-              // ▼ ここで「ゴール時刻(goalDt) － スタート時刻(globalStartDt)」を計算
+              // 「ゴール時刻(goalDt) － スタート時刻(globalStartDt)」を計算
               elapsedMs = goalDt - globalStartDt;
 
               // 日付をまたいだ場合の補正
@@ -251,7 +276,22 @@
 
     function createTeamCard(team, isHighlight) {
       const card = document.createElement('div');
-      card.className = 'team-card' + (isHighlight ? ' highlight-card' : '');
+      
+      let classNames = ['team-card'];
+      
+      // ステータスに応じて枠の色（クラス）を変える
+      if (team.status === 'ゴール' || team.status === '棄権（DNS）' || team.status === '棄権（DNF）') {
+        classNames.push('status-goal');
+      } else if (team.status === '参加') {
+        classNames.push('status-running');
+      }
+
+      // 検索されたカードの場合はハイライトクラスを追加
+      if (isHighlight) {
+        classNames.push('highlight-card');
+      }
+      
+      card.className = classNames.join(' ');
       
       let resultHtml = '';
       
@@ -260,7 +300,7 @@
       } else if (team.status === 'ゴール') {
         resultHtml = `
           <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
-            <div style="font-size: 19px; font-weight: bold; color: #2c3e50;">🎉 ${team.goalTimeStr}</div>
+            <div style="font-size: 19px; font-weight: bold; color: #2c3e50;">🏅 ${team.goalTimeStr}</div>
             <div style="font-size: 12px; font-weight: bold; color: #7f8c8d;">ゴール: ${team.clockTime}</div>
           </div>
         `;
