@@ -38,33 +38,32 @@
   </div>
   
   <div class="notice-box">
-    ⚠️ <strong>ご注意</strong><br>
-    本ページに表示されているデータは速報値であり、正式な最終結果を保証するものではありません。<br>
-    <span style="color: #d35400; font-weight: bold; margin-top: 5px; display: inline-block;">※ゴールタイム、ゴール時刻は手動計測による参考値です。</span>
+    ⚠️本ページは速報です。正式な最終結果ではありません。<br>
+    <span style="color: #d35400; font-weight: bold; margin-top: 5px; display: inline-block;">※計測は手動で実施しています。</span>
   </div>
 
-  <a href="index.html" class="nav-btn">🔙 リレー速報へ戻る</a>
+  <a href="index.html" class="nav-btn">🔙 リレー速報を見る</a>
 
   <div class="control-panel">
-    <button class="reload-btn" onclick="location.reload()">🔄 最新データに更新</button>
-    <div class="reload-note">※システム反映まで数分かかる場合があります</div>
+    <button class="reload-btn" onclick="location.reload()">🔄 ゴールしたのに　けっかがみれなかったらおしてみて</button>
+    <div class="reload-note">※ゴールしてもすぐにはけっかがみれません</div>
     
-    <input type="number" id="searchInput" class="search-box" placeholder="🔍 番号を入力...">
+    <input type="number" id="searchInput" class="search-box" placeholder="🔍 しりたいばんごうをいれる...">
 
     <select id="sortSelect" class="sort-select">
-      <option value="no">番号順</option>
-      <option value="time">ゴールタイムが速い順</option>
+      <option value="no">ばんごうじゅん</option>
+      <option value="time">ゴールしたじゅん</option>
     </select>
   </div>
 
   <div id="searchResultArea">
-    <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">検索結果</h3>
+    <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">しらべたけっか</h3>
     <div id="searchResultCard"></div>
   </div>
 
   <div id="loading">データを読み込み中...</div>
   
-  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">参加者一覧</h3>
+  <h3 style="font-size: 14px; color: #666; margin-bottom: 5px;">みんなのけっか</h3>
   <div id="teamList"></div>
 
   <script>
@@ -178,9 +177,9 @@
                 
                 // 全角に変換して組み立て
                 if (h > 0) {
-                  goalTimeStr = `${toFullWidth(h)}時間${toFullWidth(m)}分${toFullWidth(s)}秒`;
+                  goalTimeStr = `${toFullWidth(h)}じかん${toFullWidth(m)}ふん${toFullWidth(s)}びょう`;
                 } else {
-                  goalTimeStr = `${toFullWidth(m)}分${toFullWidth(s)}秒`;
+                  goalTimeStr = `${toFullWidth(m)}ふん${toFullWidth(s)}びょう`;
                 }
               } else {
                 goalTimeStr = '計算エラー';
@@ -257,24 +256,26 @@
       
       let resultHtml = '';
       
-      if (team.status === '棄権（DNS）' || team.status === '棄権（DNF）') {
-        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #e74c3c;">${team.status}</div>`;
+      if (team.status === '棄権（DNS）' ) {
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #e74c3c;">ナイスチャレンジ</div>`;
       } else if (team.status === 'ゴール') {
         resultHtml = `
           <div style="text-align: right; display: flex; flex-direction: column; gap: 4px;">
-            <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">ゴールタイム: ${team.goalTimeStr}</div>
-            <div style="font-size: 18px; font-weight: bold; color: #7f8c8d;">ゴール時刻: ${team.clockTime}</div>
+            <div style="font-size: 20px; font-weight: bold; color: #2c3e50;">タイム: ${team.goalTimeStr}</div>
+            <div style="font-size: 12px; font-weight: bold; color: #7f8c8d;">ゴール時刻: ${team.clockTime}</div>
           </div>
         `;
       } else if (team.status === '参加') {
-        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #27ae60;">参加</div>`;
-      } else {
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #27ae60;">さんかちゅう</div>`;
+      } else if (team.status === '棄権（DNF）') {
+        resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #e74c3c;">がんばりました</div>`;        
+      else {
         resultHtml = `<div style="font-size: 18px; font-weight: bold; color: #ccc;">－</div>`;
       }
 
       card.innerHTML = `
         <div class="team-header">
-          <div style="font-size: 18px; font-weight: bold; color: #222;">No.${team.noStr}</div>
+          <div style="font-size: 22px; font-weight: bold; color: #222;">No.${team.noStr}</div>
           ${resultHtml}
         </div>
       `;
