@@ -88,12 +88,19 @@
         download: true,
         complete: function(summaryRes) {
           
-          let startDtStr = summaryRes.data[1] && summaryRes.data[1][7] ? summaryRes.data[1][7].trim().replace(/^'/, '') : '';
+          // ▼ 修正: H3セル（行インデックス2）からスタート時刻を取得
+          let startDtStr = '';
+          if (summaryRes.data[2] && summaryRes.data[2][7]) {
+            startDtStr = summaryRes.data[2][7].trim().replace(/^'/, '');
+          } else if (summaryRes.data[1] && summaryRes.data[1][7]) {
+            // H3が空の場合は念のためH2をフォールバックとして確認
+            startDtStr = summaryRes.data[1][7].trim().replace(/^'/, '');
+          }
           
-          // ▼ iOS/Safari対策: YYYY-MM-DD を YYYY/MM/DD に置換してパース
           startDtStr = startDtStr.replace(/-/g, '/');
           let globalStartDt = new Date(startDtStr);
 
+          // 時刻のみ（例: "09:00:00"）だった場合の処理
           if (isNaN(globalStartDt.getTime())) {
             let parts = startDtStr.split(':');
             if (parts.length >= 2) {
@@ -127,10 +134,10 @@
             } else if (isGoal && clockTime) {
               status = 'ゴール';
               
-              // ▼ iOS/Safari対策: こちらも - を / に置換
               let clockTimeClean = clockTime.replace(/-/g, '/');
               let goalDt = new Date(clockTimeClean);
               
+              // 時刻のみだった場合の処理
               if (isNaN(goalDt.getTime())) {
                 goalDt = new Date(globalStartDt.getTime());
                 let timeString = clockTimeClean.includes(' ') ? clockTimeClean.split(' ').pop() : clockTimeClean;
@@ -147,7 +154,7 @@
                 }
               }
 
-              // ゴール時刻を YYYY-MM-DD HH:MM:SS にフォーマット
+              // ゴール時刻のフォーマット (YYYY-MM-DD HH:MM:SS)
               let yyyy = goalDt.getFullYear();
               let mm = String(goalDt.getMonth() + 1).padStart(2, '0');
               let dd = String(goalDt.getDate()).padStart(2, '0');
@@ -156,9 +163,10 @@
               let secStr = String(goalDt.getSeconds()).padStart(2, '0');
               formattedClockTime = `${yyyy}-${mm}-${dd} ${hhStr}:${minStr}:${secStr}`;
               
+              // ▼ ここで「ゴール時刻(goalDt) － スタート時刻(globalStartDt)」を計算
               elapsedMs = goalDt - globalStartDt;
 
-              // 日付情報抜け等で時刻がマイナスになった場合は24時間足して補正
+              // 日付をまたいだ場合の補正
               if (elapsedMs < 0) {
                 elapsedMs += 24 * 60 * 60 * 1000;
               }
@@ -168,7 +176,7 @@
                 let m = Math.floor((elapsedMs % 3600000) / 60000);
                 let s = Math.floor((elapsedMs % 60000) / 1000);
                 
-                // ▼ ゴールタイムを全角に変換して組み立て
+                // 全角に変換して組み立て
                 if (h > 0) {
                   goalTimeStr = `${toFullWidth(h)}時間${toFullWidth(m)}分${toFullWidth(s)}秒`;
                 } else {
