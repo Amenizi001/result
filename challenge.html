@@ -89,10 +89,20 @@
         complete: function(summaryRes) {
           
           let startDtStr = summaryRes.data[1] && summaryRes.data[1][7] ? summaryRes.data[1][7].trim().replace(/^'/, '') : '';
-          let globalStartDt = startDtStr ? new Date(startDtStr) : new Date();
+          
+          // ▼ iOS/Safari対策: YYYY-MM-DD を YYYY/MM/DD に置換してパース
+          startDtStr = startDtStr.replace(/-/g, '/');
+          let globalStartDt = new Date(startDtStr);
 
           if (isNaN(globalStartDt.getTime())) {
-            globalStartDt = new Date(); 
+            let parts = startDtStr.split(':');
+            if (parts.length >= 2) {
+              let today = new Date();
+              today.setHours(parseInt(parts[0], 10)||0, parseInt(parts[1], 10)||0, parseInt(parts[2], 10)||0, 0);
+              globalStartDt = today;
+            } else {
+              globalStartDt = new Date(); 
+            }
           }
 
           summaryData = summaryRes.data.slice(1).map(row => {
@@ -117,13 +127,13 @@
             } else if (isGoal && clockTime) {
               status = 'ゴール';
               
-              // ▼ 修正部分：CSVのデータから直接正確な日付オブジェクトを作成
-              let goalDt = new Date(clockTime);
+              // ▼ iOS/Safari対策: こちらも - を / に置換
+              let clockTimeClean = clockTime.replace(/-/g, '/');
+              let goalDt = new Date(clockTimeClean);
               
-              // 万が一「09:48:25」のように時刻しかなく、Date変換に失敗した時のための安全処理
               if (isNaN(goalDt.getTime())) {
                 goalDt = new Date(globalStartDt.getTime());
-                let timeString = clockTime.includes(' ') ? clockTime.split(' ').pop() : clockTime;
+                let timeString = clockTimeClean.includes(' ') ? clockTimeClean.split(' ').pop() : clockTimeClean;
                 let timeParts = timeString.split(':');
                 
                 if (timeParts.length >= 2) {
@@ -137,7 +147,7 @@
                 }
               }
 
-              // ▼ ゴール時刻を YYYY-MM-DD HH:MM:SS にフォーマット
+              // ゴール時刻を YYYY-MM-DD HH:MM:SS にフォーマット
               let yyyy = goalDt.getFullYear();
               let mm = String(goalDt.getMonth() + 1).padStart(2, '0');
               let dd = String(goalDt.getDate()).padStart(2, '0');
@@ -147,8 +157,13 @@
               formattedClockTime = `${yyyy}-${mm}-${dd} ${hhStr}:${minStr}:${secStr}`;
               
               elapsedMs = goalDt - globalStartDt;
+
+              // 日付情報抜け等で時刻がマイナスになった場合は24時間足して補正
+              if (elapsedMs < 0) {
+                elapsedMs += 24 * 60 * 60 * 1000;
+              }
               
-              if (!isNaN(elapsedMs) && elapsedMs >= 0) {
+              if (!isNaN(elapsedMs)) {
                 let h = Math.floor(elapsedMs / 3600000);
                 let m = Math.floor((elapsedMs % 3600000) / 60000);
                 let s = Math.floor((elapsedMs % 60000) / 1000);
